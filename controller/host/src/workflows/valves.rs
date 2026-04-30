@@ -2,8 +2,9 @@
 
 use std::sync::{Arc, Mutex};
 
-use anyhow::{Result, anyhow, bail};
+use anyhow::{Result, anyhow};
 use icd::ValveState;
+use thiserror::Error;
 
 use crate::{
     controller::{ControllerCommands, send_cntrl_cmd_now},
@@ -34,17 +35,17 @@ fn get_close_transfer_valve_permission(inst_status: Arc<Mutex<InstrumentStatus>>
 fn get_open_valve_permission(
     inst_status: Arc<Mutex<InstrumentStatus>>,
     auths: &Authorizations,
-) -> Result<()> {
+) -> Result<(), OpenValvePermissionError> {
     let (p_chamber, p_transfer) = inst_status.lock().expect("Poisoned").get_pressures();
     let auth = &auths.open_valve;
 
     let p_chamber_mbar = match p_chamber {
         PressureReading::Value(val) => val.as_millibars(),
-        _ => bail!("Chamber pressure gauge error: Check gauge and try again."),
+        _ => return Err(OpenValvePermissionError::GaugeError),
     };
     let p_transfer_mbar = match p_transfer {
         PressureReading::Value(val) => val.as_millibars(),
-        _ => bail!("Transfer pressure gauge error: Check gauge and try again."),
+        _ => return Err(OpenValvePermissionError::GaugeError),
     };
 
     let p_ratio = p_chamber_mbar / p_transfer_mbar;
@@ -58,9 +59,29 @@ fn get_open_valve_permission(
         && p_transfer_mbar < auth.low_pressure_limit_mbar
     {
         Ok(())
+    } else if p_ratio <= auth.valve_ratio_range.lower_limit {
+        Err(OpenValvePermissionError::ChamberPressureTooLow)
+    } else if p_ratio >= auth.valve_ratio_range.upper_limit {
+        Err(OpenValvePermissionError::ChamberPressureTooHigh)
     } else {
-        Err(anyhow!("Unsafe to open valve."))
+        unreachable!(
+            "This branch should be unreachable, unless there is a logic error in above comparisons. Please report!"
+        );
     }
+}
+
+/// Error possibilities when asking for permission to open valves.
+///
+/// These errors are useful and can be used when trying to pump/vent the chamber to have the correct
+/// check already there.
+#[derive(Error, Debug)]
+pub enum OpenValvePermissionError {
+    #[error("One or more gauges are unreachable")]
+    GaugeError,
+    #[error("Pressure in chamber is much smaller than pressure in transfer system.")]
+    ChamberPressureTooLow,
+    #[error("Pressure in chamber is much larger than pressure in transfer system.")]
+    ChamberPressureTooHigh,
 }
 
 /// Function to set the transfer valve.
@@ -83,7 +104,7 @@ pub fn set_pump_valve(
     inst_status: Arc<Mutex<InstrumentStatus>>,
     auths: &Authorizations,
     valve_state: ValveState,
-) -> Result<()> {
+) -> Result<(), OpenValvePermissionError> {
     if valve_state == ValveState::Open {
         get_open_valve_permission(inst_status, auths)?;
     }

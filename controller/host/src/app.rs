@@ -348,13 +348,29 @@ impl InstrumentCommandHandler {
     }
 
     fn init(&self) {
+        self.chamber_vacuum();
         self.cryocooler_set_on();
         self.cryocooler_set_setpoint();
         self.ion_pump_set_on();
         self.gauge_chamber_set_on();
         self.gauge_transfer_set_on();
         self.pump_stand_set_on();
+        self.start_sample_transfer();
         self.vent_valve_set_on();
+    }
+
+    /// Change the chamber vacuum state upon request
+    fn chamber_vacuum(&self) {
+        self.ui.global::<Logic>().on_set_chamber_is_pumped({
+            move |val| {
+                let cmd = if val {
+                    WorkflowCommands::ChamberPump
+                } else {
+                    WorkflowCommands::ChamberVent
+                };
+                send_workflow_command_now(cmd);
+            }
+        });
     }
 
     fn cryocooler_set_setpoint(&self) {
@@ -449,6 +465,16 @@ impl InstrumentCommandHandler {
                 };
                 send_hicube_command_now(HiCubeCommands::SetPumpStandState(state));
                 ui.unwrap().global::<Logic>().set_pump_stand_is_on(val);
+            }
+        });
+    }
+
+    /// Start a sample transfer
+    fn start_sample_transfer(&self) {
+        let ui = self.ui.as_weak();
+        self.ui.global::<Logic>().on_initiate_sample_transfer({
+            move || {
+                send_workflow_command_now(WorkflowCommands::StartSampleTransfer);
             }
         });
     }

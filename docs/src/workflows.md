@@ -266,6 +266,12 @@ Again, all pressure conditions in below flowchart
 come from the open valve authorization.
 The only adjustable setting is the timer.
 
+Optionally, this workflow will display a messaget to the user
+to fill the nitrogen balloon for venting.
+This notification is only necessary if the workflow is called
+from the "pump down" workflow. 
+In the "vent" workflow, this message has already been given before.
+
 > [!NOTE]
 > The first steps in the following diagram turn off both pumps.
 > These might in fact not even run at the moment.
@@ -276,7 +282,8 @@ The only adjustable setting is the timer.
 
 ```mermaid
   flowchart TD
-    PR[p<sub>ch</sub> >> p<sub>tr</sub>] --> StopIP
+    PR[p<sub>ch</sub> >> p<sub>tr</sub>] --> N2Not
+    N2Not@{ shape: paper-tape, label: "Opt: Fill N<sub>2</sub> balloon."} -->|Next| StopIP
     StopIP[/Stop ion pump/] --> StopPP
     StopPP[/Stop primary pump/] --> OVV
     OVV[/Open vent valve/] --> TIM

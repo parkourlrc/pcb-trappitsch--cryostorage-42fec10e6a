@@ -31,13 +31,18 @@ use crate::{
     workflows::{
         baking::set_baking,
         cooler::set_cooler,
-        valves::{set_pump_valve, set_transfer_valve},
+        valves::{set_pump_valve, set_transfer_valve}, vent_chamber::vent_chamber_workflow,
     },
 };
 
 mod baking;
 mod cooler;
+mod equalize_pressure;
+mod progress_windows;
+mod pump_chamber;
+mod timer;
 mod valves;
+mod vent_chamber;
 
 /// Sender for the controller commands.
 pub static WORKFLOW_COMMAND_SENDER: OnceCell<mpsc::Sender<WorkflowCommands>> =
@@ -47,10 +52,20 @@ pub static WORKFLOW_COMMAND_SENDER: OnceCell<mpsc::Sender<WorkflowCommands>> =
 ///
 /// These are the commands that the UI will send to activate the various workflows.
 pub enum WorkflowCommands {
+    /// Baking on/off.
     Baking(BakingState),
+    /// Pump the vacuum chamber.
+    ChamberPump,
+    /// Vent the vacuum chamber.
+    ChamberVent,
+    /// Cryo cooler on/off.
     CryoCoolerState(CoolerState),
-    TransferValve(ValveState),
+    /// Open/close the pump valve.
     PumpValve(ValveState),
+    /// Open/close the transfer valve.
+    TransferValve(ValveState),
+    /// Initiate a new sample transfer that guides the user through a list of tasks.
+    StartSampleTransfer,
 }
 
 /// The workflow task: Listen to WorkflowCommands and execute them.
@@ -72,11 +87,32 @@ pub async fn workflow_task(
                                 error_dialog_helper(ui.clone(), e);
                         });
                     }
+                    WorkflowCommands::ChamberPump => {
+                        println!("Pumping chamber workflow... TODO!");
+                    },
+                    WorkflowCommands::ChamberVent => {
+                        vent_chamber_workflow(Arc::clone(&inst_status), &auths, ui.clone()).await;
+                    },
                     WorkflowCommands::CryoCoolerState(state) => {
                         set_cooler(Arc::clone(&inst_status), &auths, state).unwrap_or_else(|e| {
                             error_dialog_helper(ui.clone(), e);
                         });
                     },
+                    WorkflowCommands::PumpValve(state) => {
+                        let button_value = state == ValveState::Open;
+
+                        match set_pump_valve(Arc::clone(&inst_status), &auths, state) {
+                            Ok(()) => {
+                                ui.upgrade_in_event_loop(move |ui| {
+                                    ui.global::<Logic>().set_pump_valve_is_open(button_value);
+                                }).expect("UI must be alive");
+                            },
+                            Err(e) => {
+                                error_dialog_helper(ui.clone(), e.into())
+                            }
+                        };
+
+                    }
                     WorkflowCommands::TransferValve(state) => {
                         let button_value = state == ValveState::Open;
 
@@ -91,20 +127,8 @@ pub async fn workflow_task(
                             }
                         };
                     },
-                    WorkflowCommands::PumpValve(state) => {
-                        let button_value = state == ValveState::Open;
-
-                        match set_pump_valve(Arc::clone(&inst_status), &auths, state) {
-                            Ok(()) => {
-                                ui.upgrade_in_event_loop(move |ui| {
-                                    ui.global::<Logic>().set_pump_valve_is_open(button_value);
-                                }).expect("UI must be alive");
-                            },
-                            Err(e) => {
-                                error_dialog_helper(ui.clone(), e)
-                            }
-                        };
-
+                    WorkflowCommands::StartSampleTransfer => {
+                        println!("Starting a new sample transfer... TODO!");
                     }
                 }
             }

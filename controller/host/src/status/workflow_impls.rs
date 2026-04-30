@@ -1,6 +1,7 @@
 //! Implementations of status for the workflows.
 
 use icd::{BakingState, FlowMeterState, ValveState};
+use measurements::Temperature;
 use sunpower_cryotelgt::CoolerState;
 
 use crate::status::{InstrumentStatus, PressureReading};
@@ -14,6 +15,11 @@ impl InstrumentStatus {
             self.pressure_chamber_current,
             self.pressure_transfer_current,
         )
+    }
+
+    /// Get the current sample temperature 
+    pub fn get_sample_temperature(&self) -> Temperature {
+        self.temperature_sample
     }
 
     /// Is baking turned off?

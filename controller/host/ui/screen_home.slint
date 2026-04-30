@@ -58,7 +58,6 @@ export component HomeScreen inherits MyWindow {
                     text: "Start Sample Transfer";
                     clicked() => {
                         Logic.initiate_sample_transfer();
-                        debug("Initiate sample transfer");
                     }
                 }
 
@@ -69,8 +68,7 @@ export component HomeScreen inherits MyWindow {
                     left_text: "Vent";
                     right_text: "Pump";
                     switched(set_pumped) => {
-                        Logic.set_chamber_is_pumed(set_pumped);  // bool
-                        debug("Vacuum set pumped: ",  set_pumped);
+                        Logic.set_chamber_is_pumped(set_pumped);  // bool
                     }
                 }
             }

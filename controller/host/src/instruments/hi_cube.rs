@@ -8,6 +8,8 @@
 //! - Venting valve (open/closed)
 //! - Pump stand state (on/off)
 
+use anyhow::Result;
+
 use std::sync::{Arc, Mutex};
 
 use pfeiffer_hicube::{HiCubeClient, PumpStandState, Variables as HiCubeVariables, VentState};
@@ -180,4 +182,16 @@ pub fn send_hicube_command_now(cmd: HiCubeCommands) {
     if let Err(e) = sender.try_send(cmd) {
         log::err_now!("Failed to send HiCube command: {}", e);
     }
+}
+
+/// Convenience function to send a hicube command with awaiting.
+///
+/// If an error occurs, this error is logged and also returned.
+pub async fn send_hicube_cmd_w_err(cmd: HiCubeCommands) -> Result<()> {
+    let sender = get_hicube_cmd_sender();
+    if let Err(e) = sender.send(cmd).await {
+        log::err!("Failed to send HiCube command: {}", e).await;
+        return Err(e.into());
+    }
+    Ok(())
 }

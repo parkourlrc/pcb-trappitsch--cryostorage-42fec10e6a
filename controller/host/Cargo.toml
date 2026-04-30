@@ -22,11 +22,12 @@ serde-hex       = "0.1.0"
 serialport      = "4.9"
 slint           = {version = "1", features = ["backend-linuxkms"]}
 i-slint-common  = {version = "1", features = ["fontconfig-dlopen"]}
+thiserror       = "2.0.18"
 tokio           = { version = "1", features = ["macros", "rt"] }
 
 pfeiffer_hicube = { version = "0.1.0", path = "../pfeiffer_hicube" }
 
-# Temperary!
+# Temporary!
 agilent_4uhv = { path = "../agilent_4uhv", version = "0.1.0" }
 sunpower_cryotelgt = { path = "../cryotelgt", version = "0.1.0" }
 lakeshore_336     = { path = "../lakeshore_336", version = "0.1.0" }

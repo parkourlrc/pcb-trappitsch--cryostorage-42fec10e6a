@@ -12,20 +12,24 @@ import { Palette } from "palette.slint";
 import { KeyboardLogic } from "keyboard.slint";
 
 export global ProgressWindowLogic {
-    pure callback cancel_pressed();
-    pure callback done_pressed();
-    in-out property <string> title: "Title";
-    in-out property <string> messages: "This is a very long message. Let us see if this thing wraps at some point and if it does so, where it will wrap. The goal is that it actually will, but who knows what happens. You can also break a line with backslash n\n\nor even two lines like this";
-    in-out property <bool> cancel_possible: true;
-    in-out property <bool> done_button_visible: false;
+    pure callback button_pressed();
+
+    in-out property <string> title;
+    in-out property <string> description;
+    in-out property <string> message;
+    in-out property <string> timer;
+    in-out property <bool> error_mode;
+
+    in-out property <string> button_text: "Cancel";
+    in-out property <bool> button_enabled: false;
 }
 
 export component ProgressWindow inherits Window {
     y: 20px;
 
     // FIXME: Uncomment the following two lines
-    height: 760px;
-    width: 1170px;
+    // height: 760px;
+    // width: 1170px;
 
     background: Palette.bg;
     no-frame: true;
@@ -38,29 +42,39 @@ export component ProgressWindow inherits Window {
         }
 
         MyHorizontalLayout {
-        H2Text {
-            text: ProgressWindowLogic.messages;
+            alignment: center;
+            H3Text {
+                text: ProgressWindowLogic.description;
+                font-italic: true;
+                wrap: word-wrap;
+                horizontal-alignment: center;
+            }
+        }
+
+        MyHorizontalLayout {
+            alignment: center;
+            H2Text {
+                text: ProgressWindowLogic.message;
+                wrap: word-wrap;
+                horizontal-alignment: center;
+                color: ProgressWindowLogic.error_mode ? Palette.red : Palette.text;
+            }
+        }
+
+        if ProgressWindowLogic.timer != "": H3Text {
+            text: "Remaining time:\n" + ProgressWindowLogic.timer;
             horizontal-alignment: center;
-            wrap: word-wrap;
-        }}
+        }
 
         MyHorizontalLayout {
             alignment: center;
             padding-bottom: Const.border_spacing;
 
             RegularButton {
-                enabled: ProgressWindowLogic.cancel_possible;
-                text: "Cancel";
+                enabled: ProgressWindowLogic.button_enabled;
+                text: ProgressWindowLogic.button_text;
                 clicked => {
-                    ProgressWindowLogic.cancel_pressed();
-                }
-            }
-
-            RegularButton {
-                enabled: ProgressWindowLogic.done_button_visible;
-                text: "Done";
-                clicked => {
-                    ProgressWindowLogic.done_pressed();
+                    ProgressWindowLogic.button_pressed();
                 }
             }
         }

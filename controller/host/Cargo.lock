@@ -2416,6 +2416,7 @@ dependencies = [
  "slint",
  "slint-build",
  "sunpower_cryotelgt",
+ "thiserror 2.0.18",
  "tokio",
 ]
 

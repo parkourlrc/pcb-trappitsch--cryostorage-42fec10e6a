@@ -4,9 +4,11 @@ use std::{
     fs::{self, File},
     io::Write,
     path::PathBuf,
+    time::Duration,
 };
 
-use anyhow::{Result, anyhow, bail};
+use anyhow::{Result, anyhow};
+use measurements::Temperature;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -200,6 +202,8 @@ pub struct Authorizations {
     pub baking: BakingAuthorization,
     pub cryo_cooler: CryoCoolerAuthorization,
     pub open_valve: OpenValveAuthorization,
+    pub vent_chamber: VentChamberAuthorization,
+    pub equalize_pressures: EqualizePressureAuthorization,
 }
 
 impl Default for Authorizations {
@@ -208,6 +212,8 @@ impl Default for Authorizations {
             baking: BakingAuthorization::default(),
             cryo_cooler: CryoCoolerAuthorization::default(),
             open_valve: OpenValveAuthorization::default(),
+            vent_chamber: VentChamberAuthorization::default(),
+            equalize_pressures: EqualizePressureAuthorization::default(),
         }
     }
 }
@@ -271,6 +277,66 @@ impl Default for OpenValveAuthorization {
                 "Authorization give independent of range if both gauges show pressure below the low_pressure_limit.",
             ),
             low_pressure_limit_mbar: 0.00001,
+        }
+    }
+}
+
+/// Authorization limits for venting the chamber.
+///
+/// For timer numbering, see the flowchart in the docs.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct VentChamberAuthorization {
+    __doc_timer_1: String,
+    pub timer_1: Duration,
+    __doc_timer_2: String,
+    pub timer_2: Duration,
+    __doc_timer_3: String,
+    pub timer_3: Duration,
+    __doc_sample_t_min: String,
+    pub sample_t_min: Temperature,
+}
+
+impl Default for VentChamberAuthorization {
+    fn default() -> Self {
+        Self {
+            __doc_timer_1: String::from(
+                "Duration to pump transfer system if its pressure is too high compared to the chamber to open the valves.",
+            ),
+            timer_1: Duration::from_mins(20),
+            __doc_timer_2: String::from(
+                "Duration to vent transfer system if its pressure is too low compared to the chamber to open the valves.",
+            ),
+            timer_2: Duration::from_mins(15),
+            __doc_timer_3: String::from(
+                "Duration how long the vent valve should be open to vent the chamber.",
+            ),
+            timer_3: Duration::from_mins(25),
+            __doc_sample_t_min: String::from(
+                "Authorization is given when sample temperature is above this temperature",
+            ),
+            sample_t_min: Temperature::from_kelvin(280.),
+        }
+    }
+}
+
+/// Authorizations specific for the equalize pressure workflows
+///
+/// These authorizations are the ones that are specific to the workflows to equalize the pressures
+/// in the transfer and main chamber that are necessary if the valve opening authority cannot be
+/// granted.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct EqualizePressureAuthorization {
+    __doc_timer: String,
+    pub timer: Duration,
+}
+
+impl Default for EqualizePressureAuthorization {
+    fn default() -> Self {
+        Self {
+            __doc_timer: String::from(
+                "Duration to pump/vent before pressure equalization is aborted.",
+            ),
+            timer: Duration::from_mins(20),
         }
     }
 }
