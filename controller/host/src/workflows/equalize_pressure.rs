@@ -5,9 +5,8 @@
 
 use std::sync::{Arc, Mutex};
 
-use anyhow::{Result, bail};
+use anyhow::{Result, anyhow};
 use icd::ValveState;
-use tokio::sync::{mpsc, watch};
 
 use crate::{
     app::ValveOrPumpState,
@@ -16,9 +15,7 @@ use crate::{
     prg_config::Authorizations,
     status::{InstrumentStatus, PressureReading},
     workflows::{
-        progress_windows::{ProgressWindowCommands, n2_notification},
-        timer::Timer,
-        vent_chamber::stop_pumps_open_vv,
+        MSG_FILL_N2, progress_windows::WorkflowProgress, vent_chamber::stop_pumps_open_vv,
     },
 };
 
@@ -27,27 +24,26 @@ use crate::{
 /// This means that the transfer system is first vented until we can open the pump valve.
 ///
 /// Arguments:
-/// * tx_win: Sender that allows to update the ProgressWindow.
-/// * auths: Authorizations for workflows. Contains the important limits.
-/// * rx_button_press: A watch channel that can be queried to see if the button in the Progress
-///   Window was pressed.
-/// * n2_note: If `true`, a notification will be displayed to fill the N2 balloon. This is required
+/// * `wp`: A mutable reference to the WorkflowProgress window.
+/// * `inst_status`: The current instrument status.
+/// * `auths`: Authorizations for workflows. Contains the important limits.
+/// * `n2_note`: If `true`, a notification will be displayed to fill the N2 balloon. This is required
 ///   if this workflow is called during the pump down workflow, as the pump down workflow does not
 ///   automatically display such a notification in the beginning.
 ///
 /// Returns:
 /// If any of these commands fail, an error is returned. If an `Ok(())` is returned, all has
-/// succeeded (including timers) and we will continue to work.
+/// succeeded (including timers) and we will continue to work. The error can directly be used to
+/// display the message from the main routine.
 pub async fn eq_pch_too_high(
-    tx_win: &mpsc::Sender<ProgressWindowCommands>,
+    wp: &mut WorkflowProgress,
     inst_status: Arc<Mutex<InstrumentStatus>>,
     auths: &Authorizations,
-    rx_button_press: &mut watch::Receiver<()>,
     n2_note: bool,
 ) -> Result<()> {
-    // Display fill N2 message if requested.
+    // Display fill N2 message if requested. This can only be Ok(()) as no next button exists.
     if n2_note {
-        n2_notification(tx_win, rx_button_press).await;
+        let _ = wp.notify(MSG_FILL_N2, true).await;
     }
 
     // stop the pumps and open the vent valve
@@ -67,19 +63,33 @@ pub async fn eq_pch_too_high(
             }
         }
     };
+
     let tim_duration = auths.equalize_pressures.timer;
-    let mut tim = Timer::new(tim_duration);
+    let msg = "Venting the transfer chamber to equalize pressure before opening the pump valve. \
+        Hitting cancel to stop the timer manually early might abort the process.";
 
-    if let Err(e) = tim.run_and_update(tx_win, check).await {
-        let _ = send_hicube_cmd_w_err(HiCubeCommands::SetVentingValveState(
-            ValveOrPumpState::ClosedOrOff,
-        ))
-        .await;
-        bail!(format!("Could not vent chamber: {}", e));
-    }
+    wp.show_vacuum_plot(true);
 
-    send_cntrl_cmd(ControllerCommands::PumpValve(ValveState::Open)).await;
-    Ok(())
+    let res = match wp.check_for(tim_duration, msg, check).await {
+        Ok(_) => {
+            send_cntrl_cmd(ControllerCommands::PumpValve(ValveState::Open)).await;
+            Ok(())
+        }
+        Err(_) => {
+            let _ = send_hicube_cmd_w_err(HiCubeCommands::SetVentingValveState(
+                ValveOrPumpState::ClosedOrOff,
+            ))
+            .await;
+            Err(anyhow!(
+                "Could not equalize the pressure within the given time. \
+                Closing vent valve and stopping here."
+            ))
+        }
+    };
+
+    wp.show_vacuum_plot(false);
+
+    res
 }
 
 /// Equalize the pressure if p_chamber << p_transfer.
@@ -88,14 +98,16 @@ pub async fn eq_pch_too_high(
 /// continue with whatever workflow we are in.
 ///
 /// Arguments:
-/// * tx_win: Sender that allows to update the ProgressWindow.
-/// * auths: Authorizations for workflows. Contains the important limits.
+/// * `wp`: A mutable reference to the WorkflowProgress window.
+/// * `inst_status`: The current instrument status.
+/// * `auths`: Authorizations for workflows. Contains the important limits.
 ///
 /// Returns:
 /// If any of these commands fail, an error is returned. If an `Ok(())` is returned, all has
-/// succeeded (including timers) and we will continue to work.
+/// succeeded (including timers) and we will continue to work. The error can directly be used to
+/// display the message from the main routine.
 pub async fn eq_pch_too_low(
-    tx_win: &mpsc::Sender<ProgressWindowCommands>,
+    wp: &mut WorkflowProgress,
     inst_status: Arc<Mutex<InstrumentStatus>>,
     auths: &Authorizations,
 ) -> Result<()> {
@@ -108,7 +120,7 @@ pub async fn eq_pch_too_low(
     // set up the with the escape check and the time.
     let check = {
         let cmp_ratio_ll = auths.open_valve.valve_ratio_range.lower_limit;
-        let cmp_upper_lim = auths.open_valve.low_pressure_limit_mbar;
+        let cmp_low_pressure_lim = auths.open_valve.low_pressure_limit_mbar;
         move || -> bool {
             let (p_chamber, p_transfer) = inst_status.lock().expect("Poisoned").get_pressures();
             if let PressureReading::Value(pch) = p_chamber
@@ -116,23 +128,36 @@ pub async fn eq_pch_too_low(
             {
                 let pch = pch.as_millibars();
                 let ptr = ptr.as_millibars();
-                (pch / ptr > cmp_ratio_ll) || (pch < cmp_upper_lim && ptr < cmp_upper_lim)
+                (pch / ptr > cmp_ratio_ll)
+                    || (pch < cmp_low_pressure_lim && ptr < cmp_low_pressure_lim)
             } else {
                 false
             }
         }
     };
+    let msg = "Pumping the transfer chamber to equalize pressure before opening the pump valve. \
+        Hit cancel to stop the timer.";
     let tim_duration = auths.equalize_pressures.timer;
-    let mut tim = Timer::new(tim_duration);
 
-    if let Err(e) = tim.run_and_update(tx_win, check).await {
-        let _ = send_hicube_cmd_w_err(HiCubeCommands::SetPumpStandState(
-            ValveOrPumpState::ClosedOrOff,
-        ))
-        .await;
-        bail!(format!("Could not vent chamber: {}", e));
-    }
+    wp.show_vacuum_plot(true);
 
-    send_cntrl_cmd(ControllerCommands::PumpValve(ValveState::Open)).await;
-    Ok(())
+    let res = match wp.check_for(tim_duration, msg, check).await {
+        Ok(_) => {
+            send_cntrl_cmd(ControllerCommands::PumpValve(ValveState::Open)).await;
+            Ok(())
+        }
+        Err(_) => {
+            let _ = send_hicube_cmd_w_err(HiCubeCommands::SetPumpStandState(
+                ValveOrPumpState::ClosedOrOff,
+            ))
+            .await;
+            Err(anyhow!(
+                "Could not equalize the pressure within the given time. Turning the pump stand off."
+            ))
+        }
+    };
+
+    wp.show_vacuum_plot(false);
+
+    res
 }

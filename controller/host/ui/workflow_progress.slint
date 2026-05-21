@@ -8,20 +8,27 @@ import {
     H1Text,
     MyHorizontalLayout,
 } from "elements.slint";
+import { Logic } from "logic.slint";
 import { Palette } from "palette.slint";
 import { KeyboardLogic } from "keyboard.slint";
 
 export global ProgressWindowLogic {
-    pure callback button_pressed();
+    pure callback action_button_pressed();
+    pure callback cancel_button_pressed();
+    pure callback ok_button_pressed();
+    pure callback next_button_pressed();
 
-    in-out property <string> title;
-    in-out property <string> description;
-    in-out property <string> message;
-    in-out property <string> timer;
-    in-out property <bool> error_mode;
+    in-out property <string> title;  // the title of the workflow
+    in-out property <string> description;  // general, short description of the workflow
+    in-out property <string> message;  // a small message to the user
+    in-out property <string> timer;  // a timer, if it exists
+    in-out property <bool> error_mode;  // If true, message is displayed in red.
+    in-out property <bool> show_vacuum_plot;
 
-    in-out property <string> button_text: "Cancel";
-    in-out property <bool> button_enabled: false;
+    // Define some default buttons and an action button that is user adjustable. 
+    in-out property <bool> cancel_button_enabled;
+    in-out property <bool> ok_button_enabled;
+    in-out property <bool> next_button_enabled;
 }
 
 export component ProgressWindow inherits Window {
@@ -51,7 +58,7 @@ export component ProgressWindow inherits Window {
             }
         }
 
-        MyHorizontalLayout {
+        if ProgressWindowLogic.message != "": MyHorizontalLayout {
             alignment: center;
             H2Text {
                 text: ProgressWindowLogic.message;
@@ -66,15 +73,46 @@ export component ProgressWindow inherits Window {
             horizontal-alignment: center;
         }
 
+        if ProgressWindowLogic.show_vacuum_plot: Rectangle {
+            background: white;
+
+            x: 100px;
+
+            width: 800px;
+            height: 400px;
+
+            // img := Image {
+            //     source: Logic.vacuum_plot;
+            //     horizontal-alignment: center;
+            // }
+
+        }
+
         MyHorizontalLayout {
             alignment: center;
             padding-bottom: Const.border_spacing;
 
-            RegularButton {
-                enabled: ProgressWindowLogic.button_enabled;
-                text: ProgressWindowLogic.button_text;
+            if ProgressWindowLogic.cancel_button_enabled: RegularButton {
+                enabled: true;
+                text: "Cancel";
                 clicked => {
-                    ProgressWindowLogic.button_pressed();
+                    ProgressWindowLogic.cancel_button_pressed();
+                }
+            }
+
+            if ProgressWindowLogic.next_button_enabled: RegularButton {
+                enabled: true;
+                text: "Next";
+                clicked => {
+                    ProgressWindowLogic.next_button_pressed();
+                }
+            }
+
+            if ProgressWindowLogic.ok_button_enabled: RegularButton {
+                enabled: true;
+                text: "Ok";
+                clicked => {
+                    ProgressWindowLogic.ok_button_pressed();
                 }
             }
         }

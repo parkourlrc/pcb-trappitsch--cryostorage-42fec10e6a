@@ -5,7 +5,6 @@ use anyhow::{Result, anyhow};
 
 use slint::Weak;
 use std::sync::{Arc, Mutex};
-use tokio::sync::{mpsc, oneshot, watch};
 
 use crate::{
     app::{AppWindow, ValveOrPumpState},
@@ -17,12 +16,9 @@ use crate::{
     prg_config::Authorizations,
     status::InstrumentStatus,
     workflows::{
+        MSG_FILL_N2,
         equalize_pressure::{eq_pch_too_high, eq_pch_too_low},
-        progress_windows::{
-            ProgressWindowCommands, close_prg_window, disp_error_and_close, n2_notification,
-            new_progress_window, prg_cmd, prg_msg,
-        },
-        timer::Timer,
+        progress_windows::WorkflowProgress,
         valves::{OpenValvePermissionError, set_pump_valve},
     },
 };
@@ -30,7 +26,6 @@ use crate::{
 /// Run the vent chamber workflow.
 ///
 /// While this is running, the UI is blocked from any further action.
-/// TODO: Decide if this is also true for waiting for vent valve to close...
 ///
 /// Once the workflow has terminated, no result is returned. If an error occured, This will be
 /// displayed in the progress window and the user is expected to hit "Done" after reading the final
@@ -40,54 +35,76 @@ pub async fn vent_chamber_workflow(
     auths: &Authorizations,
     ui: Weak<AppWindow>,
 ) {
+    // THE DEMO
+    // let desc =
+    //     "Vent the chamber and transfer system. This process takes between 25 and 45 minutes.";
+    // let mut wp = WorkflowProgress::new("Venting the chamber", desc, ui.clone()).await;
+    //
+    // if wp.notify("This is a notification.").await.is_err() {
+    //     wp.finalize("Screw you", false).await;
+    //     return;
+    // };
+    //
+    // // show the vacuum plot till the timer expires or the user presses cancel.
+    // wp.show_vacuum_plot(true);
+    // let _ = wp
+    //     .wait_for(
+    //         Duration::from_secs(13),
+    //         "Here's the vacuum plot for the duration of the timer or till you hit cancel.",
+    //     )
+    //     .await;
+    // wp.show_vacuum_plot(false);
+    //
+    // // start a timer of 10 seconds.
+    // if wp
+    //     .wait_for(
+    //         Duration::from_secs(10),
+    //         "Please be a nice person and wait for the timer to finish.",
+    //     )
+    //     .await
+    //     .is_ok()
+    // {
+    //     wp.finalize("Good boy, have a cookie", false).await;
+    //     return;
+    // };
+    //
+    // // somebody pressed cancel, let's give them a really long timer that expires after 5 sec with a
+    // // message.
+    // let check = {
+    //     let now = std::time::Instant::now();
+    //     move || std::time::Instant::now() - now > Duration::from_secs(5)
+    // };
+    //
+    // if wp
+    //     .check_for(
+    //         Duration::from_hours(200),
+    //         "Bad boy, no chocolate for you!",
+    //         check,
+    //     )
+    //     .await
+    //     .is_ok()
+    // {
+    //     wp.finalize("Haha, got you. Next time be better", false)
+    //         .await;
+    // } else {
+    //     wp.finalize("WTF, again?????", true).await;
+    // };
+    // END DEMO
+
     let desc =
         "Vent the chamber and transfer system. This process takes between 25 and 45 minutes.";
+    let mut wp = WorkflowProgress::new("Venting the chamber", desc, ui.clone()).await;
 
-    // Channels for sending commands to deal with the displayed progress window
-    let (tx_window_cmd, rx_window_cmd) = mpsc::channel(50);
-
-    // Temporary oneshot channel get a weak handle to the progress window.
-    let (tx_get_prg_window, rx_get_prg_window) = oneshot::channel();
-    // One shot channel to be sent when the user presses a button.
-    let (tx_button_press, mut rx_button_press) = watch::channel(());
-    rx_button_press.mark_unchanged();
-
-    // Let's get the progress window going
-    ui.upgrade_in_event_loop(move |_| {
-        new_progress_window(
-            rx_window_cmd,
-            "Vacuum chamber venting",
-            desc,
-            tx_get_prg_window,
-            tx_button_press,
-        )
-        .unwrap();
-    })
-    .expect("UI must be alive");
-
-    // Now get the progress window to work with later.
-    let pw = rx_get_prg_window.await.expect("This must work");
-
-    // Start of the workflow
-    //
-    // Make user check for nitrogen in the balloon.
-    n2_notification(&tx_window_cmd, &mut rx_button_press).await;
+    // N2 fill notification.
+    if wp.notify(MSG_FILL_N2, false).await.is_err() {
+        wp.close();
+        return;
+    };
 
     // Check that cryocooler is off
-    prg_cmd(
-        &tx_window_cmd,
-        ProgressWindowCommands::SetButtonText("Cancel".into()),
-    )
-    .await;
-    prg_cmd(&tx_window_cmd, ProgressWindowCommands::EnableButton(false)).await;
     if !inst_status.lock().expect("Poisoned").is_cryo_cooler_off() {
-        disp_error_and_close(
-            &tx_window_cmd,
-            "Cannot vent the chamber while the cryo cooler is on.",
-            rx_button_press.clone(),
-        )
-        .await;
-        close_prg_window(ui, pw);
+        wp.finalize("Cannot vent the chamber while the cryo cooler is on.", true)
+            .await;
         return;
     }
 
@@ -98,16 +115,14 @@ pub async fn vent_chamber_workflow(
         .get_sample_temperature()
         <= auths.vent_chamber.sample_t_min
     {
-        disp_error_and_close(
-            &tx_window_cmd,
+        wp.finalize(
             &format!(
                 "Cannot vent because the sample is too cold. The sample must be warmer than {}.",
                 auths.vent_chamber.sample_t_min
             ),
-            rx_button_press.clone(),
+            true,
         )
         .await;
-        close_prg_window(ui, pw);
         return;
     }
 
@@ -118,91 +133,57 @@ pub async fn vent_chamber_workflow(
     {
         let eq_result = match open_valve_err {
             OpenValvePermissionError::GaugeError => Err(anyhow!(
-                "Authorization for opening the pump valve failed. Make sure everything is connected, running, and try again."
+                "Authorization for opening the pump valve failed. \
+                Make sure everything is connected, running, and try again."
             )),
             OpenValvePermissionError::ChamberPressureTooLow => {
-                eq_pch_too_low(&tx_window_cmd, Arc::clone(&inst_status), auths).await
+                eq_pch_too_low(&mut wp, Arc::clone(&inst_status), auths).await
             }
             OpenValvePermissionError::ChamberPressureTooHigh => {
-                eq_pch_too_high(
-                    &tx_window_cmd,
-                    Arc::clone(&inst_status),
-                    auths,
-                    &mut rx_button_press,
-                    false,
-                )
-                .await
+                eq_pch_too_high(&mut wp, Arc::clone(&inst_status), auths, false).await
             }
         };
 
         // pressure can't be equalized, we error out of here.
         if let Err(eq_err) = eq_result {
-            disp_error_and_close(
-                &tx_window_cmd,
-                &format!("{eq_err}"),
-                rx_button_press.clone(),
-            )
-            .await;
-            close_prg_window(ui, pw);
+            wp.finalize(&format!("{eq_err}"), true).await;
             return;
         }
     }
 
-    // vent the chamber
-    if let Err(e) = vent_chamber(&tx_window_cmd, auths, rx_button_press.clone()).await {
-        let msg = format!("Could not vent chamber: {}", e);
-        disp_error_and_close(&tx_window_cmd, &msg, rx_button_press.clone()).await;
-        close_prg_window(ui, pw);
+    // vent the chamber.
+    if let Err(e) = vent_chamber(&mut wp, auths).await {
+        let msg = format!("Venting not finished: {}", e);
+        wp.finalize(&msg, true).await;
         return;
     };
 
     // Success, wait for user to press done button, then close
-    prg_msg(&tx_window_cmd, "Chamber vented successfully.").await;
-    tx_window_cmd
-        .send(ProgressWindowCommands::SetButtonText("Done".into()))
-        .await
-        .unwrap();
-    tx_window_cmd
-        .send(ProgressWindowCommands::EnableButton(true))
-        .await
-        .unwrap();
-
-    rx_button_press.mark_unchanged();
-    let _ = rx_button_press.changed().await;
-    close_prg_window(ui, pw);
+    wp.finalize("Chamber vented successfully.", false).await;
 }
 
-async fn vent_chamber(
-    tx_win: &mpsc::Sender<ProgressWindowCommands>,
-    auths: &Authorizations,
-    rx_button_press: watch::Receiver<()>,
-) -> Result<()> {
+async fn vent_chamber(wp: &mut WorkflowProgress, auths: &Authorizations) -> Result<()> {
     stop_pumps_open_vv().await?;
 
-    // vent valve timer, after which we close the valve.
-    prg_cmd(tx_win, ProgressWindowCommands::EnableButton(true)).await;
+    let msg = "Vent valve is open. \
+        Waiting for timer to close and finish venting the chamber. \
+        If you hit cancel, the vent valve will immediately be closed \
+        and the venting process finished.";
+    let tim_duration = auths.vent_chamber.timer_3;
 
-    // Set the message of what we are doing now.
-    prg_msg(
-        tx_win,
-        "Vent valve is open. Waiting for timer to close and finish venting the chamber. 
-        If you hit cancel, the vent valve will immediately be closed and 
-        the venting process finished.",
-    )
-    .await;
+    wp.show_vacuum_plot(true);
 
     // Escape timer when cancel button is pressed.
-    let check = {
-        let mut rx = rx_button_press.clone();
-        rx.mark_unchanged();
-        move || -> bool { rx.has_changed().unwrap_or(false) }
+    let res = match wp.wait_for(tim_duration, msg).await {
+        Ok(_) => Ok(()),
+        Err(_) => Err(anyhow!(
+            "Cancel was pressed during final vent. Please close the vent valve manually."
+        )),
     };
 
-    let tim_duration = auths.vent_chamber.timer_3;
-    let mut tim = Timer::new(tim_duration);
-    tim.run_and_update(tx_win, check).await?;
+    wp.show_vacuum_plot(false);
 
-    Ok(())
+    res
 }
 
 /// Stop both pumps and open the vent valve

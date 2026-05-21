@@ -31,7 +31,8 @@ use crate::{
     workflows::{
         baking::set_baking,
         cooler::set_cooler,
-        valves::{set_pump_valve, set_transfer_valve}, vent_chamber::vent_chamber_workflow,
+        valves::{set_pump_valve, set_transfer_valve},
+        vent_chamber::vent_chamber_workflow,
     },
 };
 
@@ -43,6 +44,9 @@ mod pump_chamber;
 mod timer;
 mod valves;
 mod vent_chamber;
+
+/// Some static strings to use for consistent messaging.
+static MSG_FILL_N2: &str = "Ensure that there is nitrogen in the balloon and press next.";
 
 /// Sender for the controller commands.
 pub static WORKFLOW_COMMAND_SENDER: OnceCell<mpsc::Sender<WorkflowCommands>> =

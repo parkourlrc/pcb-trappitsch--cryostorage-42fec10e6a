@@ -17,7 +17,7 @@ impl InstrumentStatus {
         )
     }
 
-    /// Get the current sample temperature 
+    /// Get the current sample temperature
     pub fn get_sample_temperature(&self) -> Temperature {
         self.temperature_sample
     }
