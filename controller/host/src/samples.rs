@@ -99,6 +99,12 @@ impl Samples {
         }
     }
 
+    /// Is the samples list empty?
+    pub fn is_empty(&self) -> bool {
+        let cnt = self.names.iter().filter(|s| !s.1.name.is_empty()).count();
+        cnt == 0
+    }
+
     /// Swap two positions.
     ///
     /// Returns an array that contains two tuples, each touple containing the a position name and a

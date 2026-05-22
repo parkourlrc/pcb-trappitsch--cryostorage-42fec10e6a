@@ -35,6 +35,7 @@ pub struct PrgConfig {
     pfeiffer_omnicontrol: OmniControlConfig,
     samples: Samples,
     lakeshore_temperature: LakeshoreTempConfig,
+    safety_warnings: SafetyWarnings,
     suntel_cryocooler: CryoCoolerConfig,
 }
 
@@ -58,6 +59,7 @@ impl PrgConfig {
             pfeiffer_omnicontrol: OmniControlConfig::default(),
             samples: Samples::new(),
             lakeshore_temperature: LakeshoreTempConfig::default(),
+            safety_warnings: SafetyWarnings::default(),
             suntel_cryocooler: CryoCoolerConfig::default(),
         };
 
@@ -147,6 +149,11 @@ impl PrgConfig {
         self.agilent_ion_pump.clone()
     }
 
+    /// Get the max safe sample temperature.
+    pub fn get_max_safe_sample_temperature(&self) -> Temperature {
+        self.safety_warnings.max_safe_sample_temperature
+    }
+
     /// Get a clone of the Omnicontrol configuration.
     pub fn get_omnicontrol_config(&self) -> OmniControlConfig {
         self.pfeiffer_omnicontrol.clone()
@@ -179,6 +186,11 @@ impl PrgConfig {
     /// Get a clone of the samples.
     pub fn get_samples(&self) -> Samples {
         self.samples.clone()
+    }
+
+    /// Check if the samples are empty.
+    pub fn is_samples_empty(&self) -> bool {
+        self.samples.is_empty()
     }
 
     /// Update the samples, save to file, and return index of updated entry.
@@ -378,4 +390,21 @@ impl Default for EqualizePressureAuthorization {
 pub struct SafeRangeLimits {
     pub lower_limit: f64,
     pub upper_limit: f64,
+}
+
+/// A structure to hold software implemented warning limits.
+///
+/// Depending on how the chamber is running, these warning limits might trigger a buzzer and warning
+/// in the system when they are under or overstepped.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SafetyWarnings {
+    pub max_safe_sample_temperature: Temperature,
+}
+
+impl Default for SafetyWarnings {
+    fn default() -> Self {
+        Self {
+            max_safe_sample_temperature: Temperature::from_kelvin(130.),
+        }
+    }
 }

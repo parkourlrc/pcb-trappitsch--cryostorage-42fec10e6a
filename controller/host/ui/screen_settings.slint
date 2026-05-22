@@ -175,6 +175,13 @@ export component SettingsScreen inherits MyWindow {
                 }
 
                 LongButton {
+                    text: "Test alarm";
+                    clicked => {
+                        Logic.test_alarm_pressed();
+                    }
+                }
+
+                LongButton {
                     text: "Exit program";
                     enabled: true;
                     clicked => {

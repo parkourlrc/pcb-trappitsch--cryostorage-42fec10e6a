@@ -10,7 +10,7 @@ use icd::{BakingState, LightState, ValveState, VctHandshake};
 use measurements::Temperature;
 use slint::{Model, SharedString, Weak};
 use sunpower_cryotelgt::CoolerState;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{OnceCell, mpsc, oneshot};
 
 use crate::{
     controller::{ControllerCommands, send_cntrl_cmd_now},
@@ -25,6 +25,7 @@ use crate::{
         send_temperature_plot_cmd_now,
     },
     prg_config::PrgConfig,
+    safety::test_alarm,
     samples::get_sample_idx,
     status::InstrumentStatus,
     workflows::{
@@ -34,12 +35,16 @@ use crate::{
 
 slint::include_modules!();
 
+pub static UI: OnceCell<Weak<AppWindow>> = OnceCell::const_new();
+
 pub fn app_main(
     conf: Arc<Mutex<PrgConfig>>,
     inst_status: Arc<Mutex<InstrumentStatus>>,
     tx_ui_set_logger: oneshot::Sender<Weak<AppWindow>>,
 ) -> Result<(), Box<dyn Error>> {
     let ui = AppWindow::new()?;
+
+    let _ = UI.set(ui.as_weak());
 
     if tx_ui_set_logger.send(ui.as_weak()).is_err() {
         panic!("Failed to send UI to the logger");
@@ -195,6 +200,7 @@ impl GuiCommandHandler {
         // buttons
         self.test_button(); // FIXME: Delete
         self.admin_mode();
+        self.test_alarm();
         self.close_button();
         self.edit_sample_name();
         self.sample_swiped();
@@ -253,6 +259,15 @@ impl GuiCommandHandler {
                         }
                     });
                 }
+            }
+        });
+    }
+
+    fn test_alarm(&self) {
+        self.ui.global::<Logic>().on_test_alarm_pressed({
+            move || {
+                println!("test alarm button was pressed!");
+                test_alarm();
             }
         });
     }
@@ -471,7 +486,6 @@ impl InstrumentCommandHandler {
 
     /// Start a sample transfer
     fn start_sample_transfer(&self) {
-        let ui = self.ui.as_weak();
         self.ui.global::<Logic>().on_initiate_sample_transfer({
             move || {
                 send_workflow_command_now(WorkflowCommands::StartSampleTransfer);

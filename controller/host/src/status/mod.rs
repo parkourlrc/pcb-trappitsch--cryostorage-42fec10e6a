@@ -19,6 +19,7 @@ use crate::{
 
 mod controller_impls;
 mod instruments_impls;
+mod safety_impls;
 mod workflow_impls;
 
 pub struct InstrumentStatus {

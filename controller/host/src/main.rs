@@ -16,6 +16,7 @@ mod log;
 mod plots;
 mod prg_config;
 mod rotation;
+mod safety;
 mod samples;
 mod status;
 mod workflows;

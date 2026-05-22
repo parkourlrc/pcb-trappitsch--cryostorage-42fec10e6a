@@ -4,36 +4,36 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-anyhow          = "1"
-async-compat    = "0.2.5"
-chrono          = { version = "0.4", features = ["serde"] }
-icd             = { path = "../icd", version = "0.1.0" }
-measurements    = { version = "0.11.1", features = ["serde", "std"] }
-plotters        = { version = "0.3", default-features = false, features = [
-                      "bitmap_backend",
-                      "chrono",
-                      "line_series",
-                      "ttf"
-                    ]}
+anyhow = "1"
+async-compat = "0.2.5"
+chrono = { version = "0.4", features = ["serde"] }
+icd = { path = "../icd", version = "0.1.0" }
+measurements = { version = "0.11.1", features = ["serde", "std"] }
+plotters = { version = "0.3", default-features = false, features = [
+  "bitmap_backend",
+  "chrono",
+  "line_series",
+  "ttf",
+] }
 poststation-sdk = "0.4"
-ron             = "0.12"
-serde           = { version = "1", features = ["derive"] }
-serde-hex       = "0.1.0"
-serialport      = "4.9"
-slint           = {version = "1", features = ["backend-linuxkms"]}
-i-slint-common  = {version = "1", features = ["fontconfig-dlopen"]}
-thiserror       = "2.0.18"
-tokio           = { version = "1", features = ["macros", "rt"] }
+ron = "0.12"
+serde = { version = "1", features = ["derive"] }
+serde-hex = "0.1.0"
+serialport = "4.9"
+slint = { version = "1", features = ["backend-linuxkms"] }
+i-slint-common = { version = "1", features = ["fontconfig-dlopen"] }
+thiserror = "2.0.18"
+tokio = { version = "1", features = ["macros", "rt"] }
 
 pfeiffer_hicube = { version = "0.1.0", path = "../pfeiffer_hicube" }
 
 # Temporary!
 agilent_4uhv = { path = "../agilent_4uhv", version = "0.1.0" }
 sunpower_cryotelgt = { path = "../cryotelgt", version = "0.1.0" }
-lakeshore_336     = { path = "../lakeshore_336", version = "0.1.0" }
+lakeshore_336 = { path = "../lakeshore_336", version = "0.1.0" }
 pfeiffer-omnicontrol = { path = "../pfeiffer_omnicontrol", version = "0.1.0" }
-instrumentrs    = { path = "../instrumentRs", version = "0.1.0" }
+instrumentrs = { path = "../instrumentRs", version = "0.1.0" }
 
 [build-dependencies]
-chrono          = "0.4"
-slint-build     = "1"
+chrono = "0.4"
+slint-build = "1"

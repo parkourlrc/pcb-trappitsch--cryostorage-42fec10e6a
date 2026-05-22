@@ -1,12 +1,54 @@
 # Safety
 
+## Software safety
+
+This section describes software-safety built-ins.
+These safeties are generally implemented as alarms,
+i.e., they will notify the user in case something fails.
+The alarm will generally (1) display an error message
+and (2) sound the built-in buzzer.
+
+Once the user clicks "Close" on the alarm message,
+the buzzer will be cancelled and the safety stays deactivated for five minutes.
+After this time has elapsed and the safety is still of importance,
+it will be reactivated.
+The alarm will not occur again unless (1) something actually happens again or
+(2) the user has not fixed the issue.
+
+> [!TIP]
+> The "Settings" screen contains a button that can be used to enable a test-alarm.
+> This alarm will be cancelled and will not recur after the "Close" button is pressed.
+> It simply serves to demonstrate the buzzer sound to a new user.
+
+### Sample safety
+
+If the cryocooler is on and samples are stored in the UI,
+we assume that samples are loaded that should stay cold.
+In this case, whenever the instruments are polled
+(which is approximately every three seconds),
+the host software will check the following conditions:
+
+- Is the water flow okay (and thus by proxy the cryocooler)?
+- Is the ion pump on?
+- Is the pump stand on?
+- Is the current sample temperature larger than 130 Kelvin?
+
+If any of these conditions are not met, an alarm is raised.
+This will inform the user that an issue has occurred that should be checked.
+
+> [!NOTE]
+> The minimum sample temperature can be set in the UI configuration.
+> See [the GUI section](./gui.md) for more details.
+
+## Hardware safety
+
 This section describes the hardware-side safeties
 that were implemented for the cryostorage chamber.
 These safeties are as far as possible implemented in the circuit design,
 meaning that they do not require firmware or software to properly work.
 Caveats to these limitations are discussed below.
 
-## Cryocooler safety
+### Cryocooler safety
 
 The cryocooler must not be run when there is no or insufficient cooling water.
 Thus, not allowing the cryocooler to start when powering it up and ensuring
@@ -41,7 +83,7 @@ In normal operation (all okay), the soft stop pin is connected to ground
 such that the voltage on this pin is 0V.
 This connection to ground passes through two MOSFETS, Q9 and Q10.
 
-### Water interlock
+#### Water interlock
 
 If the waterflow is high enough for running the cryocooler,
 24V are supplied from pin 3 to pin 4 on the flow meter connector J9.
@@ -55,7 +97,7 @@ drops to 0V and opens the connection to ground between R33 and the soft-stop pin
 This results in 5V being applied to the soft-stop
 and thus the cryocooler will stop.
 
-### Electronics interlock
+#### Electronics interlock
 
 The electronics interlock shuts down the cryocooler
 if power to the control board is lost.
@@ -68,7 +110,7 @@ If for some reason the power to the electronics is lost,
 the gate will be at 0V, open the connection to ground,
 and thus put the safe-stop pin at 5V and shut down the cryocooler.
 
-### Caveat
+#### Caveat
 
 Above described hardware safety depends on the cryocooler being set
 to be controlled via the soft-stop mode.
@@ -100,7 +142,7 @@ that something is wrong.
 Since a running cryocooler is audible, we feel that these safety measures
 are sufficient to ensure safe operations.
 
-## Transfer valve closing safety
+### Transfer valve closing safety
 
 If the VCT is open and the valves are open,
 it is possible for the VCT's transfer arm to be inside the chamber

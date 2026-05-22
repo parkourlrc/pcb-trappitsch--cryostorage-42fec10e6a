@@ -40,6 +40,7 @@ use crate::instruments::omnicontrol::{Gauge, GaugeStatus, OmniControlInst};
 use crate::instruments::utils::ThermocoupleChannelName;
 use crate::log;
 use crate::prg_config::PrgConfig;
+use crate::safety::sample_safety;
 use crate::status::InstrumentStatus;
 
 pub mod cryocooler;
@@ -172,6 +173,12 @@ pub async fn instruments_task(
         }
     } // drop lock
 
+    // Get the max safe sample temperature from the program configuration (only needed once).
+    let max_safe_sample_temperature = prg_conf
+        .lock()
+        .expect("ProgramConfig lock poisoned")
+        .get_max_safe_sample_temperature();
+
     // set later to a reasonable value
     let mut polling_interval = Duration::from_millis(1);
 
@@ -236,9 +243,32 @@ pub async fn instruments_task(
                 inst_status.lock().expect("InstrumentStatus lock poisoned")
                     .set_pressures(pressures);
 
+                // Get the status of the ion pump. Poll regularly in case it turned off.
+                let ion_pump_state = match ion_pump_inst.get_high_voltage() {
+                    Ok(HvState::On) => ValveOrPumpState::OpenOrOn,
+                    Ok(HvState::Off) => ValveOrPumpState::ClosedOrOff,
+                    Err(_) => {
+                        ion_pump_inst.reset_instrument();
+                        ValveOrPumpState::UndefinedOrError
+                    }
+                };
+
+                if inst_status.lock().expect("InstrumentStatus lock poisoned")
+                    .set_ion_pump_state_and_ui(ion_pump_state).is_err()
+                {
+                    log::err_now!("Failed to set ion pump state in UI");
+                }
+
                 // Update UI
                 inst_status.lock().expect("InstrumentStatus lock poisoned")
                     .update_ui_instrument_status();
+
+                // Check for sample safety if any samples are loaded.
+                let smpls_empty = prg_conf.lock().expect("ProgramConfig lock poisoned").is_samples_empty();
+                if !smpls_empty {
+                    let is = inst_status.lock().expect("InstrumentStatus lock poisoned");
+                    sample_safety(&is, &max_safe_sample_temperature);
+                }
 
                 // after init, set polling interval to normal value
                 if polling_interval != POLLING_INTERVAL {

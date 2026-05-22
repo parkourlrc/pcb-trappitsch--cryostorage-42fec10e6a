@@ -3,6 +3,7 @@ import { Palette } from "palette.slint";
 import { NormalText, RegularButton, H3Text } from "elements.slint";
 
 export component ErrorDialog inherits Window {
+    in property <string> error_header: "Error:";
     in property <string> error_message: "An error has occurred.\n\nYou did something stupid, you moron.";
     pure callback close_pressed();
 
@@ -26,7 +27,7 @@ export component ErrorDialog inherits Window {
         alignment: center;
 
         H3Text {
-            text: "Error:";
+            text: error_header;
         }
 
         NormalText {
