@@ -25,11 +25,16 @@ use crate::{
 
 /// Run the vent chamber workflow.
 ///
-/// While this is running, the UI is blocked from any further action.
+/// While this is running, the UI is hidden by the progress window display.
 ///
 /// Once the workflow has terminated, no result is returned. If an error occured, This will be
 /// displayed in the progress window and the user is expected to hit "Done" after reading the final
 /// problem message and then this workflow is over.
+///
+/// Arguments:
+/// - `inst_status`: Instrument status.
+/// - `auths`: Authorizations.
+/// - `ui`: A weak handle to the main user interface.
 pub async fn vent_chamber_workflow(
     inst_status: Arc<Mutex<InstrumentStatus>>,
     auths: &Authorizations,

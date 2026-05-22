@@ -31,6 +31,7 @@ use crate::{
     workflows::{
         baking::set_baking,
         cooler::set_cooler,
+        pump_chamber::pump_chamber_workflow,
         valves::{set_pump_valve, set_transfer_valve},
         vent_chamber::vent_chamber_workflow,
     },
@@ -92,7 +93,7 @@ pub async fn workflow_task(
                         });
                     }
                     WorkflowCommands::ChamberPump => {
-                        println!("Pumping chamber workflow... TODO!");
+                        pump_chamber_workflow(Arc::clone(&inst_status), &auths, ui.clone()).await;
                     },
                     WorkflowCommands::ChamberVent => {
                         vent_chamber_workflow(Arc::clone(&inst_status), &auths, ui.clone()).await;

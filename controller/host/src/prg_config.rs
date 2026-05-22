@@ -8,7 +8,7 @@ use std::{
 };
 
 use anyhow::{Result, anyhow};
-use measurements::Temperature;
+use measurements::{Pressure, Temperature};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -203,6 +203,7 @@ pub struct Authorizations {
     pub cryo_cooler: CryoCoolerAuthorization,
     pub open_valve: OpenValveAuthorization,
     pub vent_chamber: VentChamberAuthorization,
+    pub pump_chamber: PumpChamberAuthorization,
     pub equalize_pressures: EqualizePressureAuthorization,
 }
 
@@ -213,6 +214,7 @@ impl Default for Authorizations {
             cryo_cooler: CryoCoolerAuthorization::default(),
             open_valve: OpenValveAuthorization::default(),
             vent_chamber: VentChamberAuthorization::default(),
+            pump_chamber: PumpChamberAuthorization::default(),
             equalize_pressures: EqualizePressureAuthorization::default(),
         }
     }
@@ -315,6 +317,36 @@ impl Default for VentChamberAuthorization {
                 "Authorization is given when sample temperature is above this temperature",
             ),
             sample_t_min: Temperature::from_kelvin(280.),
+        }
+    }
+}
+
+/// Authorization limits for when pumping the chamber.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PumpChamberAuthorization {
+    __doc_timer_primary_pump: String,
+    pub timer_primary_pump: Duration,
+    __doc_pressure_limit_primary_pump: String,
+    pub pressure_limit_primary_pump: Pressure,
+    __doc_timer_ion_pump: String,
+    pub timer_ion_pump: Duration,
+}
+
+impl Default for PumpChamberAuthorization {
+    fn default() -> Self {
+        Self {
+            __doc_timer_primary_pump: String::from(
+                "Duration to wait for pressure to reach the all okay level.",
+            ),
+            timer_primary_pump: Duration::from_mins(40),
+            __doc_pressure_limit_primary_pump: String::from(
+                "Pressure that needs to be reached within `timer_primary_pump` time.",
+            ),
+            pressure_limit_primary_pump: Pressure::from_millibars(1.0e-5),
+            __doc_timer_ion_pump: String::from(
+                "Duration to wait after primary pump limit is reached before starting ion pump.",
+            ),
+            timer_ion_pump: Duration::from_hours(2),
         }
     }
 }

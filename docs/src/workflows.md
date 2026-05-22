@@ -62,7 +62,7 @@ this workflow as well.
 
 ## Start cryocooler
 
-```mermaid 
+```mermaid
   flowchart TD
     T[Start cryocooler] --> WS{{Water safety okay}}
     WS -->|No| Err[/Abort/]
@@ -78,7 +78,7 @@ this workflow as well.
 
 ## Start baking
 
-```mermaid 
+```mermaid
   flowchart TD
     T[Baking chamber] --> CC{{Cryocooler off?}}
     CC -->|No| Err[/Abort baking/]
@@ -214,9 +214,9 @@ are the same as the ones for valve authorization.
       CVV[/Close vent valve/]
     end
     PCLW -->|Failure| Err
-    PCLW[[p<sub>ch</sub> << p<sub>tr</sub>]] -->|Success| PCHK
+    PCLW[[p<sub>ch</sub> << p<sub>tr</sub>]] -->|Success| PP
     PCHW -->|Failure| Err
-    PCHW -->|Success| CVV --> OP 
+    PCHW -->|Success| CVV --> PP 
 ```
 
 ## Equalize chamber pressure
@@ -269,7 +269,7 @@ The only adjustable setting is the timer.
 Optionally, this workflow will display a messaget to the user
 to fill the nitrogen balloon for venting.
 This notification is only necessary if the workflow is called
-from the "pump down" workflow. 
+from the "pump down" workflow.
 In the "vent" workflow, this message has already been given before.
 
 > [!NOTE]
