@@ -5,7 +5,7 @@ use icd::{BakingState, FlowMeterState, InstrumentState, LightState, ValveState};
 use slint::ComponentHandle;
 
 use crate::{
-    app::{BakingTime, Logic, ValveOrPumpState},
+    app::{BakingTime, Logic, UI, ValveOrPumpState},
     status::InstrumentStatus,
 };
 
@@ -22,7 +22,7 @@ impl InstrumentStatus {
         // set UI with buttons (baking is set from broadcast)
         let valve_pump_is_open = self.valve_pump_call.is_open();
         let valve_transfer_is_open = self.valve_transfer_call.is_open();
-        if let Some(ui) = &self.ui {
+        if let Some(ui) = UI.get() {
             ui.upgrade_in_event_loop(move |ui| {
                 ui.global::<Logic>()
                     .set_pump_valve_is_open(valve_pump_is_open);
@@ -45,9 +45,8 @@ impl InstrumentStatus {
         self.chamber_light = state.clone();
 
         let light_is_on = matches!(state, LightState::On);
-        let ui = self
-            .ui
-            .as_ref()
+        let ui = UI
+            .get()
             .ok_or_else(|| anyhow::anyhow!("UI not set"))?
             .clone();
         ui.upgrade_in_event_loop(move |ui| {
@@ -79,7 +78,7 @@ impl InstrumentStatus {
 
     /// Update the UI after a controller broadcast.
     fn update_ui_controler_broadcast(&self) {
-        if let Some(ui) = &self.ui {
+        if let Some(ui) = UI.get() {
             // Baking
             let (baking_is_enabled, baking_time) = match self.baking_curr {
                 BakingState::On { time_sec } => {

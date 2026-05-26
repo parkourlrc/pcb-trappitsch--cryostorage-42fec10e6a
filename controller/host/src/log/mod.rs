@@ -2,13 +2,12 @@
 //!
 //! These messages should also ultimately be saved to a log file whenever a new message shows up.
 
-use slint::Weak;
+use crate::app::get_ui_wait;
+
 use tokio::{
-    sync::{OnceCell, mpsc, oneshot},
+    sync::{OnceCell, mpsc},
     time::{Instant, sleep_until},
 };
-
-use crate::app::AppWindow;
 
 mod logger;
 
@@ -21,14 +20,9 @@ pub const LOG_FNAME: &str = "cryostorage.log";
 /// Async handler that runs the LogHandler.
 ///
 /// Shuts down when a shutdown signal is received.
-pub async fn log_handler_task(
-    mut log_handler: LogHandler,
-    rx_ui_set: oneshot::Receiver<Weak<AppWindow>>,
-) {
-    // Wait for the UI to be set
-    if let Ok(ui) = rx_ui_set.await {
-        log_handler.set_ui(ui);
-    }
+pub async fn log_handler_task(mut log_handler: LogHandler) {
+    // wait till UI is set.
+    let _ = get_ui_wait().await;
 
     let mut next_rotation = Instant::now() + crate::LOG_ROTATION_DURATION;
     let mut rx_shutdown = crate::HALT_SENDER.get().unwrap().subscribe();

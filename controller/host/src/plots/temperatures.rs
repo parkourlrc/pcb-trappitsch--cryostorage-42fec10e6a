@@ -4,14 +4,14 @@ use std::f64;
 
 use anyhow::{Result, anyhow, bail};
 use plotters::prelude::*;
-use slint::{ComponentHandle, Weak};
+use slint::ComponentHandle;
 use tokio::{
     sync::mpsc,
     time::{Instant, sleep_until},
 };
 
 use crate::{
-    app::{AppWindow, Logic},
+    app::{Logic, UI},
     log,
     plots::{
         Measurements, PLOT_STYLE, PlotSizePx, TIME_INTERVAL_CLEANUP, TIME_RANGE_TO_KEEP,
@@ -21,12 +21,10 @@ use crate::{
 
 pub enum TemperaturePlotCommands {
     AddDataPoint(TemperatureDataPoint),
-    SetUi(Weak<AppWindow>),
 }
 
 pub struct TemperaturePlot {
     measurements: Measurements,
-    ui: Option<Weak<AppWindow>>,
     plot_size: PlotSizePx,
 }
 
@@ -37,19 +35,13 @@ impl TemperaturePlot {
 
         Self {
             measurements,
-            ui: None,
             plot_size,
         }
     }
 
-    /// Set the UI to this struct.
-    pub fn set_ui(&mut self, ui: Weak<AppWindow>) {
-        self.ui = Some(ui);
-    }
-
     /// Make the plot for the temperature display with a logarithmic scenario and set it to the UI.
     fn plot_it(&self) -> Result<()> {
-        let ui = match &self.ui {
+        let ui = match UI.get() {
             Some(ui) => ui,
             None => bail!("Cannot make temperature plot: UI not set."),
         };
@@ -182,9 +174,6 @@ pub async fn temperature_plot_task(mut rx: mpsc::Receiver<TemperaturePlotCommand
 
                         plot.measurements.push_temperature(dp);
                         plot.make_plot();
-                    }
-                    TemperaturePlotCommands::SetUi(ui) => {
-                        plot.set_ui(ui);
                     }
                 }
             }

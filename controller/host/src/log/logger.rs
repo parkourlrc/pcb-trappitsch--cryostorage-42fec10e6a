@@ -3,12 +3,12 @@
 use std::{fmt::Display, fs::OpenOptions, io::Write, path::PathBuf};
 
 use chrono::{DateTime, Local};
-use slint::{ComponentHandle, Model, Weak};
+use slint::{ComponentHandle, Model};
 use tokio::sync::mpsc;
 
 use crate::{
     CONFIG_FOLDER, LOG_LEVEL_DISPLAY,
-    app::{AppWindow, Logic},
+    app::{Logic, UI},
     log,
     rotation::rotate,
 };
@@ -84,8 +84,6 @@ impl Display for LogMessage {
 pub struct LogHandler {
     /// The log message receiver.
     rx: mpsc::Receiver<LogMessage>,
-    /// Weak reference to the UI for upgrading. Has to be set after initializing the LogHandler.
-    ui: Option<Weak<AppWindow>>,
     /// File name of log file, will be stored in CONFIG_FOLDER.
     log_file: PathBuf,
 }
@@ -98,16 +96,7 @@ impl LogHandler {
             .expect("Config folder is initialized")
             .join(super::LOG_FNAME);
 
-        Self {
-            rx,
-            ui: None,
-            log_file,
-        }
-    }
-
-    /// Allows setting the UI once the UI is created.
-    pub fn set_ui(&mut self, ui: Weak<AppWindow>) {
-        self.ui = Some(ui);
+        Self { rx, log_file }
     }
 
     /// Add a new log message to the handler and process it.
@@ -153,7 +142,7 @@ impl LogHandler {
 
     /// Update the UI, if it is already set. Otherwise just do nothing.
     pub fn update_ui(&self, msg: LogMessage) {
-        if let Some(ui) = &self.ui {
+        if let Some(ui) = UI.get() {
             ui.upgrade_in_event_loop(move |ui| {
                 let model = ui.global::<Logic>().get_log_messages();
                 let model = model

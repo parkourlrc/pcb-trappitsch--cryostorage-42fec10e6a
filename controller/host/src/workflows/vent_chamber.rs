@@ -3,11 +3,10 @@
 use agilent_4uhv::HvState;
 use anyhow::{Result, anyhow};
 
-use slint::Weak;
 use std::sync::{Arc, Mutex};
 
 use crate::{
-    app::{AppWindow, ValveOrPumpState},
+    app::ValveOrPumpState,
     instruments::{
         InstrumentCommands,
         hi_cube::{HiCubeCommands, send_hicube_cmd_w_err},
@@ -38,7 +37,6 @@ use crate::{
 pub async fn vent_chamber_workflow(
     inst_status: Arc<Mutex<InstrumentStatus>>,
     auths: &Authorizations,
-    ui: Weak<AppWindow>,
 ) {
     // THE DEMO
     // let desc =
@@ -98,7 +96,7 @@ pub async fn vent_chamber_workflow(
 
     let desc =
         "Vent the chamber and transfer system. This process takes between 25 and 45 minutes.";
-    let mut wp = WorkflowProgress::new("Venting the chamber", desc, ui.clone()).await;
+    let mut wp = WorkflowProgress::new("Venting the chamber", desc).await;
 
     // N2 fill notification.
     if wp.notify(MSG_FILL_N2, false).await.is_err() {

@@ -7,7 +7,7 @@ use slint::{ComponentHandle, Weak};
 use tokio::sync::{mpsc, oneshot};
 
 use crate::{
-    app::{AppWindow, ProgressWindow, ProgressWindowLogic},
+    app::{ProgressWindow, ProgressWindowLogic, get_ui_wait},
     workflows::timer::Timer,
 };
 
@@ -77,8 +77,9 @@ impl WorkflowProgress {
     /// - `title`: The title of the workflow progress window.
     /// - `desc`: The description of the process of the progress workflow window.
     /// - `ui`: The main UI that can start this whole thing in its main loop.
-    pub async fn new(title: &str, desc: &str, ui: Weak<AppWindow>) -> Self {
+    pub async fn new(title: &str, desc: &str) -> Self {
         let (tx, rx) = mpsc::channel(16);
+        let ui = get_ui_wait().await;
 
         let (txos, rxos) = oneshot::channel();
         ui.upgrade_in_event_loop({

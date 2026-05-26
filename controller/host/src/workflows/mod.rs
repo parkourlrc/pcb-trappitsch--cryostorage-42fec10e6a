@@ -18,13 +18,13 @@
 use std::sync::{Arc, Mutex};
 
 use icd::{BakingState, ValveState};
-use slint::{ComponentHandle, Weak};
+use slint::ComponentHandle;
 use sunpower_cryotelgt::CoolerState;
 use tokio::sync::{OnceCell, mpsc};
 
 use crate::{
-    app::{AppWindow, Logic},
-    dialog::show_error_dialog,
+    app::{Logic, get_ui_wait},
+    dialog::error_dialog_helper,
     log,
     prg_config::Authorizations,
     status::InstrumentStatus,
@@ -77,30 +77,30 @@ pub enum WorkflowCommands {
 pub async fn workflow_task(
     inst_status: Arc<Mutex<InstrumentStatus>>,
     auths: Authorizations,
-    ui: Weak<AppWindow>,
     mut rx_wf: mpsc::Receiver<WorkflowCommands>,
 ) {
     let mut rx_shutdown = crate::HALT_SENDER.get().unwrap().subscribe();
+    let ui = get_ui_wait().await;
 
     loop {
         tokio::select! {
             Some(cmd) = rx_wf.recv() => {
                 match cmd {
                     WorkflowCommands::Baking(state) => {
-                        set_baking(Arc::clone(&inst_status), &auths, ui.clone(), state)
+                        set_baking(Arc::clone(&inst_status), &auths, state)
                             .unwrap_or_else(|e| {
-                                error_dialog_helper(ui.clone(), e);
+                                error_dialog_helper(e);
                         });
                     }
                     WorkflowCommands::ChamberPump => {
-                        pump_chamber_workflow(Arc::clone(&inst_status), &auths, ui.clone()).await;
+                        pump_chamber_workflow(Arc::clone(&inst_status), &auths).await;
                     },
                     WorkflowCommands::ChamberVent => {
-                        vent_chamber_workflow(Arc::clone(&inst_status), &auths, ui.clone()).await;
+                        vent_chamber_workflow(Arc::clone(&inst_status), &auths).await;
                     },
                     WorkflowCommands::CryoCoolerState(state) => {
                         set_cooler(Arc::clone(&inst_status), &auths, state).unwrap_or_else(|e| {
-                            error_dialog_helper(ui.clone(), e);
+                            error_dialog_helper(e);
                         });
                     },
                     WorkflowCommands::PumpValve(state) => {
@@ -113,7 +113,7 @@ pub async fn workflow_task(
                                 }).expect("UI must be alive");
                             },
                             Err(e) => {
-                                error_dialog_helper(ui.clone(), e.into())
+                                error_dialog_helper(e.into())
                             }
                         };
 
@@ -128,7 +128,7 @@ pub async fn workflow_task(
                                 }).expect("UI must be alive");
                             },
                             Err(e) => {
-                                error_dialog_helper(ui.clone(), e)
+                                error_dialog_helper(e)
                             }
                         };
                     },
@@ -142,16 +142,6 @@ pub async fn workflow_task(
             }
         }
     }
-}
-
-/// Helper function to show an error dialog in the UI from an error type.
-fn error_dialog_helper(ui: Weak<AppWindow>, e: anyhow::Error) {
-    ui.upgrade_in_event_loop(move |_| {
-        if let Err(e_show) = show_error_dialog(e) {
-            log::err_now!("Failed to show error dialog: {}", e_show);
-        };
-    })
-    .expect("UI must be alive");
 }
 
 /// Get a cone of the workflow command sender.

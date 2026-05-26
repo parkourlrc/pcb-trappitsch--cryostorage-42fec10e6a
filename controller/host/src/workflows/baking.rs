@@ -4,11 +4,12 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::{Result, bail};
 use icd::{BakingState, ValveState};
-use slint::{ComponentHandle, Weak};
+use slint::ComponentHandle;
 
 use crate::{
-    app::{AppWindow, Logic},
+    app::{Logic, UI},
     controller::{ControllerCommands, send_cntrl_cmd_now},
+    log,
     prg_config::Authorizations,
     status::{InstrumentStatus, PressureReading},
     workflows::valves::set_pump_valve,
@@ -23,7 +24,6 @@ use crate::{
 fn get_start_baking_permission(
     inst_status: Arc<Mutex<InstrumentStatus>>,
     auths: &Authorizations,
-    ui: Weak<AppWindow>,
 ) -> Result<()> {
     // Is the cryocooler off?
     if !inst_status.lock().expect("Poisoned").is_cryo_cooler_off() {
@@ -51,10 +51,14 @@ fn get_start_baking_permission(
     if !inst_status.lock().expect("Poisoned").is_pump_valve_open() {
         set_pump_valve(inst_status, auths, ValveState::Open)?;
         // if we opened successfully, we need to toggle the UI switch too
-        ui.upgrade_in_event_loop(move |ui| {
-            ui.global::<Logic>().set_pump_valve_is_open(true);
-        })
-        .expect("UI must be alive");
+        if let Some(ui) = UI.get() {
+            ui.upgrade_in_event_loop(move |ui| {
+                ui.global::<Logic>().set_pump_valve_is_open(true);
+            })
+            .expect("UI must be alive");
+        } else {
+            log::err_now!("Cannot get a handle to the UI in get start baking permisison.")
+        }
     }
 
     Ok(())
@@ -64,11 +68,10 @@ fn get_start_baking_permission(
 pub fn set_baking(
     inst_status: Arc<Mutex<InstrumentStatus>>,
     auths: &Authorizations,
-    ui: Weak<AppWindow>,
     baking_state: BakingState,
 ) -> Result<()> {
     if baking_state != BakingState::Off {
-        get_start_baking_permission(inst_status, auths, ui)?;
+        get_start_baking_permission(inst_status, auths)?;
     };
     send_cntrl_cmd_now(ControllerCommands::Baking(baking_state));
     Ok(())

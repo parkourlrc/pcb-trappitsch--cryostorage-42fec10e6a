@@ -9,13 +9,9 @@
 use icd::{BakingState, FlowMeterState, LightState, ValveState, VctState};
 use measurements::{Power, Pressure, Temperature};
 use pfeiffer_hicube::PumpStandState;
-use slint::Weak;
 use sunpower_cryotelgt::CoolerState;
 
-use crate::{
-    app::{AppWindow, ValveOrPumpState},
-    instruments::omnicontrol::GaugeStatus,
-};
+use crate::{app::ValveOrPumpState, instruments::omnicontrol::GaugeStatus};
 
 mod controller_impls;
 mod instruments_impls;
@@ -23,7 +19,6 @@ mod safety_impls;
 mod workflow_impls;
 
 pub struct InstrumentStatus {
-    ui: Option<Weak<AppWindow>>,
     baking_call: BakingState,
     baking_curr: BakingState,
     chamber_light: LightState,
@@ -52,7 +47,6 @@ impl InstrumentStatus {
     /// Create a new InstrumentStatus with a given ui and default values.
     pub fn new() -> Self {
         Self {
-            ui: None,
             baking_call: BakingState::default(),
             baking_curr: BakingState::default(),
             chamber_light: LightState::Off,
@@ -76,18 +70,6 @@ impl InstrumentStatus {
             valve_transfer_curr: ValveState::default(),
             vct_curr: VctState::default(),
         }
-    }
-
-    /// Get if the UI is set.
-    pub fn get_ui_is_set(&self) -> bool {
-        self.ui.is_some()
-    }
-
-    /// Set the UI component of this class.
-    ///
-    /// Can be set later such that the new can initialize it as `None`.
-    pub fn set_ui(&mut self, ui: Weak<AppWindow>) {
-        self.ui = Some(ui);
     }
 }
 

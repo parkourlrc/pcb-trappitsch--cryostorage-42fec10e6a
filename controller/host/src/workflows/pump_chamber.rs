@@ -4,10 +4,8 @@ use anyhow::anyhow;
 
 use std::sync::{Arc, Mutex};
 
-use slint::Weak;
-
 use crate::{
-    app::{AppWindow, ValveOrPumpState},
+    app::ValveOrPumpState,
     instruments::hi_cube::{HiCubeCommands, send_hicube_cmd_w_err},
     prg_config::Authorizations,
     status::{InstrumentStatus, PressureReading},
@@ -32,10 +30,9 @@ use crate::{
 pub async fn pump_chamber_workflow(
     inst_status: Arc<Mutex<InstrumentStatus>>,
     auths: &Authorizations,
-    ui: Weak<AppWindow>,
 ) {
     let desc = "Pumping the chamber and transfer system. This process can take up to around 3h.";
-    let mut wp = WorkflowProgress::new("Venting the chamber", desc, ui.clone()).await;
+    let mut wp = WorkflowProgress::new("Venting the chamber", desc).await;
 
     // Make sure user didn't press the button accidentally.
     if wp

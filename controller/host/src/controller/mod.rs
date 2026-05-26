@@ -13,7 +13,7 @@ use tokio::{
     time::sleep,
 };
 
-use crate::{log, status::InstrumentStatus};
+use crate::{app::get_ui_wait, log, status::InstrumentStatus};
 
 mod client;
 
@@ -170,14 +170,8 @@ pub async fn controller_broadcast_listener(
 
     let mut run_initialize = true; // If true, runs initialize after broadcast
 
-    // Wait for UI to be set in InstrumentStatus
-    while !inst_status
-        .lock()
-        .expect("InstrumentStatus lock poisoned")
-        .get_ui_is_set()
-    {
-        tokio::time::sleep(Duration::from_millis(100)).await;
-    }
+    // Wait for UI to be globally available.
+    let _ = get_ui_wait().await;
 
     // Tell the light to initialize itslef :)
     send_cntrl_cmd(ControllerCommands::InitializeLight()).await;

@@ -5,7 +5,7 @@ use std::{
     time::Duration,
 };
 
-use tokio::sync::{OnceCell, broadcast, mpsc, oneshot};
+use tokio::sync::{OnceCell, broadcast, mpsc};
 
 mod app;
 mod connections;
@@ -53,11 +53,10 @@ async fn main() {
 
     // LogHandler
     let (tx_log, rx_log) = mpsc::channel(128);
-    let (tx_ui_set, rx_ui_set) = oneshot::channel();
     let log_handler = log::LogHandler::new(rx_log);
     log::LOG_SENDER.set(tx_log).expect("Uninitialized");
 
-    let log_handler_listen = tokio::spawn(log::log_handler_task(log_handler, rx_ui_set));
+    let log_handler_listen = tokio::spawn(log::log_handler_task(log_handler));
 
     // Pressure plotting task
     let (tx_p_plot, rx_p_plot) = mpsc::channel(32);
@@ -120,7 +119,7 @@ async fn main() {
     .await;
 
     // start the app
-    match app::app_main(Arc::clone(&conf), Arc::clone(&inst_status), tx_ui_set) {
+    match app::app_main(Arc::clone(&conf), Arc::clone(&inst_status)) {
         Ok(_) => {
             tx_halt.send(()).unwrap();
             let _ = tokio::join!(

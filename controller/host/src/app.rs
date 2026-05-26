@@ -3,6 +3,7 @@
 use std::{
     error::Error,
     sync::{Arc, Mutex},
+    time::Duration,
 };
 
 use agilent_4uhv::HvState;
@@ -10,7 +11,7 @@ use icd::{BakingState, LightState, ValveState, VctHandshake};
 use measurements::Temperature;
 use slint::{Model, SharedString, Weak};
 use sunpower_cryotelgt::CoolerState;
-use tokio::sync::{OnceCell, mpsc, oneshot};
+use tokio::sync::{OnceCell, mpsc};
 
 use crate::{
     controller::{ControllerCommands, send_cntrl_cmd_now},
@@ -19,10 +20,6 @@ use crate::{
         hi_cube::{HiCubeCommands, send_hicube_command_now},
         omnicontrol::Gauge,
         send_instr_cmd_now,
-    },
-    plots::{
-        PressurePlotCommands, TemperaturePlotCommands, send_pressure_plot_cmd_now,
-        send_temperature_plot_cmd_now,
     },
     prg_config::PrgConfig,
     safety::test_alarm,
@@ -40,21 +37,10 @@ pub static UI: OnceCell<Weak<AppWindow>> = OnceCell::const_new();
 pub fn app_main(
     conf: Arc<Mutex<PrgConfig>>,
     inst_status: Arc<Mutex<InstrumentStatus>>,
-    tx_ui_set_logger: oneshot::Sender<Weak<AppWindow>>,
 ) -> Result<(), Box<dyn Error>> {
     let ui = AppWindow::new()?;
 
     let _ = UI.set(ui.as_weak());
-
-    if tx_ui_set_logger.send(ui.as_weak()).is_err() {
-        panic!("Failed to send UI to the logger");
-    };
-
-    // pass the ui to the instrument status handler
-    inst_status.lock().expect("Poisoned").set_ui(ui.as_weak());
-    // pass the ui to the plotting task
-    send_pressure_plot_cmd_now(PressurePlotCommands::SetUi(ui.as_weak()));
-    send_temperature_plot_cmd_now(TemperaturePlotCommands::SetUi(ui.as_weak()));
 
     // initialize the workflow channel and spawn the task.
     let (tx_wf, rx_wf) = mpsc::channel(32);
@@ -62,12 +48,7 @@ pub fn app_main(
         .set(tx_wf.clone())
         .expect("Uninitialized");
     let auths = conf.lock().expect("Poisoned").get_authorizations();
-    let _wf_taks = tokio::spawn(workflow_task(
-        Arc::clone(&inst_status),
-        auths,
-        ui.as_weak(),
-        rx_wf,
-    ));
+    let _wf_taks = tokio::spawn(workflow_task(Arc::clone(&inst_status), auths, rx_wf));
 
     // initialize the various GUI handlers
     let _controller_cmd_handler = ControllerCommandHandler::new(ui.as_weak());
@@ -266,7 +247,6 @@ impl GuiCommandHandler {
     fn test_alarm(&self) {
         self.ui.global::<Logic>().on_test_alarm_pressed({
             move || {
-                println!("test alarm button was pressed!");
                 test_alarm();
             }
         });
@@ -571,5 +551,18 @@ impl KeyboardInput {
                     .set_text_entered(text.into());
             }
         });
+    }
+}
+
+/// An async function that allows us to wait for the UI to be set to the OnceCell.
+///
+/// If the UI is set, a clone to its weak handle will be returned immediately. Otherwise, it will
+/// recheck every 100ms until the UI is set. This wait should only happen in the very beginning.
+pub async fn get_ui_wait() -> Weak<AppWindow> {
+    loop {
+        if let Some(ui) = UI.get() {
+            return ui.clone();
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
     }
 }

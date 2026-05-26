@@ -19,7 +19,7 @@
 //! something. This is acceptable for our use case. Worse case scenario will be that the interface
 //! freezes until a timeout is hit.
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -30,8 +30,8 @@ use measurements::{Power, Temperature};
 use sunpower_cryotelgt::CoolerState;
 use tokio::sync::{OnceCell, mpsc};
 
-use crate::app::ValveOrPumpState;
-use crate::dialog::show_error_dialog;
+use crate::app::{ValveOrPumpState, get_ui_wait};
+use crate::dialog::error_dialog_helper;
 use crate::instruments::cryocooler::CryoCoolerInst;
 use crate::instruments::hi_cube::HiCubeCommands;
 use crate::instruments::ion_pump::IonPumpInst;
@@ -108,14 +108,8 @@ pub async fn instruments_task(
     // Get shutdown receiver
     let mut rx_shutdown = crate::HALT_SENDER.get().unwrap().subscribe();
 
-    // Wait for UI to be set in InstrumentStatus
-    while !inst_status
-        .lock()
-        .expect("InstrumentStatus lock poisoned")
-        .get_ui_is_set()
-    {
-        tokio::time::sleep(Duration::from_millis(100)).await;
-    }
+    // Wait for the UI to be globally available.
+    let _ = get_ui_wait().await;
 
     // Set the instrument initial states
     // cryocooler
@@ -299,9 +293,9 @@ pub async fn instruments_task(
                             },
                             Err(e) => {
                                 log::err!("Failed to set cryocooler state: {}", e).await;
-                                show_error_dialog(
-                                    "Setting cryocooler state failed. Please check connections and try again!"
-                                ).expect("If this does not work, we want to panic!");
+                                error_dialog_helper(
+                                    anyhow!("Setting cryocooler state failed. Please check connections and try again!")
+                                );
                             }
                         }
                     }

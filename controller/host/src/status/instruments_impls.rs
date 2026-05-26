@@ -10,7 +10,7 @@ use slint::ComponentHandle;
 use sunpower_cryotelgt::CoolerState;
 
 use crate::{
-    app::{Logic, PumpStandStateGUI, ValveOrPumpState},
+    app::{Logic, PumpStandStateGUI, UI, ValveOrPumpState},
     instruments::omnicontrol::{Gauge, GaugeStatus},
     plots::{
         PressureDataPoint, PressurePlotCommands, TemperatureDataPoint, TemperaturePlotCommands,
@@ -41,9 +41,8 @@ impl InstrumentStatus {
             PumpStandStateGUI::SpinningDown => false,
             PumpStandStateGUI::Error => false,
         };
-        let ui = self
-            .ui
-            .as_ref()
+        let ui = UI
+            .get()
             .ok_or_else(|| anyhow::anyhow!("UI not set"))?
             .clone();
         ui.upgrade_in_event_loop(move |ui| {
@@ -59,9 +58,8 @@ impl InstrumentStatus {
         self.hi_cube_venting_valve = state;
         let valve_is_open = matches!(state, ValveOrPumpState::OpenOrOn);
 
-        let ui = self
-            .ui
-            .as_ref()
+        let ui = UI
+            .get()
             .ok_or_else(|| anyhow::anyhow!("UI not set"))?
             .clone();
         ui.upgrade_in_event_loop(move |ui| {
@@ -77,9 +75,8 @@ impl InstrumentStatus {
         self.ion_pump_state = state;
 
         let ion_pump_switch_state = matches!(state, ValveOrPumpState::OpenOrOn);
-        let ui = self
-            .ui
-            .as_ref()
+        let ui = UI
+            .get()
             .ok_or_else(|| anyhow::anyhow!("UI not set"))?
             .clone();
         ui.upgrade_in_event_loop(move |ui| {
@@ -95,9 +92,8 @@ impl InstrumentStatus {
     pub fn set_temperature_setpoint_and_ui(&mut self, setpoint: Temperature) -> Result<()> {
         self.temperature_setpoint = setpoint;
 
-        let ui = self
-            .ui
-            .as_ref()
+        let ui = UI
+            .get()
             .ok_or_else(|| anyhow::anyhow!("UI not set"))?
             .clone();
         ui.upgrade_in_event_loop(move |ui| {
@@ -112,9 +108,8 @@ impl InstrumentStatus {
     pub fn set_cooler_state_and_ui(&mut self, state: CoolerState) -> Result<()> {
         self.cooler_state = state.clone();
 
-        let ui = self
-            .ui
-            .as_ref()
+        let ui = UI
+            .get()
             .ok_or_else(|| anyhow::anyhow!("UI not set"))?
             .clone();
         ui.upgrade_in_event_loop(move |ui| {
@@ -210,7 +205,7 @@ impl InstrumentStatus {
 
     /// Update the UI with the current instrument status.
     pub fn update_ui_instrument_status(&self) {
-        if let Some(ui) = &self.ui {
+        if let Some(ui) = UI.get() {
             let sample_temp = self.temperature_sample.as_kelvin().round() as i32;
             let bridge_temp = self.temperature_bridge.as_kelvin().round() as i32;
             let cooler_temp = self.temperature_cooler.as_kelvin().round() as i32;

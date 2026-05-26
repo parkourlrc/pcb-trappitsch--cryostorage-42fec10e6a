@@ -2,14 +2,14 @@
 
 use anyhow::{Result, anyhow, bail};
 use plotters::prelude::*;
-use slint::{ComponentHandle, Weak};
+use slint::ComponentHandle;
 use tokio::{
     sync::mpsc,
     time::{Instant, sleep_until},
 };
 
 use crate::{
-    app::{AppWindow, Logic},
+    app::{Logic, UI},
     log,
     plots::{
         Measurements, PLOT_STYLE, PlotSizePx, PressureDataPoint, TIME_INTERVAL_CLEANUP,
@@ -19,12 +19,10 @@ use crate::{
 
 pub enum PressurePlotCommands {
     AddDataPoint(PressureDataPoint),
-    SetUi(Weak<AppWindow>),
 }
 
 pub struct PressurePlot {
     measurements: Measurements,
-    ui: Option<Weak<AppWindow>>,
     plot_size: PlotSizePx,
 }
 
@@ -35,19 +33,13 @@ impl PressurePlot {
 
         Self {
             measurements,
-            ui: None,
             plot_size,
         }
     }
 
-    /// Set the UI to this struct.
-    pub fn set_ui(&mut self, ui: Weak<AppWindow>) {
-        self.ui = Some(ui);
-    }
-
     /// Make the plot for the pressure display with a logarithmic scenario and set it to the UI.
     fn plot_it(&self) -> Result<()> {
-        let ui = match &self.ui {
+        let ui = match UI.get() {
             Some(ui) => ui,
             None => bail!("Cannot make pressure plot: UI not set."),
         };
@@ -171,9 +163,6 @@ pub async fn pressure_plot_task(mut rx: mpsc::Receiver<PressurePlotCommands>) {
 
                         plot.measurements.push_pressure(dp);
                         plot.make_plot();
-                    }
-                    PressurePlotCommands::SetUi(ui) => {
-                        plot.set_ui(ui);
                     }
                 }
             }

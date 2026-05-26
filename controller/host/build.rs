@@ -1,6 +1,6 @@
 //! Build script that contains all the information to build the slint UI.
 
-use std::{io, process::Command};
+use std::io;
 
 fn main() -> io::Result<()> {
     set_build_version();
