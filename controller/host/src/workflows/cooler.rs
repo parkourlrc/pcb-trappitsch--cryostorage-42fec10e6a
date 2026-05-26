@@ -7,6 +7,7 @@ use anyhow::{Result, anyhow, bail};
 use sunpower_cryotelgt::CoolerState;
 
 use crate::{
+    PRG_CONF,
     instruments::{InstrumentCommands, send_instr_cmd_now},
     prg_config::Authorizations,
     status::{InstrumentStatus, PressureReading},
@@ -43,6 +44,26 @@ fn get_start_cooler_permission(
     }
 }
 
+/// Get permission to stop the cryocooler.
+///
+/// Checks if any samples are currently loaded in the UI. This is not perfect, however should
+/// prevent turning off the cryocooler by accident.
+fn get_stop_cooler_permission() -> Result<()> {
+    match PRG_CONF.get() {
+        Some(pc) => {
+            if !pc
+                .lock()
+                .expect("ProgramConfig lock is poisoned")
+                .is_samples_empty()
+            {
+                bail!("The cryocooler cannot be stopped if samples are currently loaded.");
+            }
+        }
+        _ => bail!("Cannot obtain the program config. This should not be possible. Report as bug."),
+    }
+    Ok(())
+}
+
 /// Function to set the cryocooler.
 pub fn set_cooler(
     inst_status: Arc<Mutex<InstrumentStatus>>,
@@ -51,6 +72,8 @@ pub fn set_cooler(
 ) -> Result<()> {
     if cooler_state == CoolerState::Enabled {
         get_start_cooler_permission(inst_status, auths)?
+    } else {
+        get_stop_cooler_permission()?
     }
     send_instr_cmd_now(InstrumentCommands::CryoCoolerState(cooler_state));
     Ok(())

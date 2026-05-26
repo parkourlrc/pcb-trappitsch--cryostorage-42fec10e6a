@@ -73,8 +73,19 @@ this workflow as well.
     PCH -->|Yes| Ok[/Start cryocooler/]
 ```
 
+## Stop cryocooler
+
+```mermaid
+  flowchart TD
+    T[Stop cryocooler] --> Smp{{Are any samples loaded?}}
+    Smp -->|Yes| Err[/Abort/]
+    Smp -->|No| Ok[/Stop cryocooler/]
+```
+
 > [!NOTE]
-> Stopping the cryocooler does not require a workflow as nothing needs to be checked.
+> This workflow can of course only check if any samples are currently set
+> in the graphical user interface.
+> If samples are currently set, an error will be displayed.
 
 ## Start baking
 

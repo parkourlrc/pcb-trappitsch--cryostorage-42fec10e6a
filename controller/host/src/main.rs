@@ -25,6 +25,7 @@ use crate::{
     controller::start_controller_tasks,
     instruments::{hi_cube::pfeiffer_hicube_task, instruments_task},
     plots::{pressure_plot_task, temperature_plot_task},
+    prg_config::PrgConfig,
     status::InstrumentStatus,
 };
 
@@ -36,6 +37,8 @@ pub const LOG_LEVEL_DISPLAY: log::Level = log::Level::Warning;
 
 pub static HALT_SENDER: OnceCell<broadcast::Sender<()>> = OnceCell::const_new();
 
+pub static PRG_CONF: OnceCell<Arc<Mutex<PrgConfig>>> = OnceCell::const_new();
+
 #[tokio::main]
 async fn main() {
     // first let's create the config and archive folders if they don't exist already.
@@ -43,6 +46,7 @@ async fn main() {
 
     // config
     let conf = Arc::new(Mutex::new(prg_config::PrgConfig::try_new().unwrap()));
+    PRG_CONF.set(Arc::clone(&conf)).expect("Uninitialized");
 
     // status of instrument
     let inst_status = Arc::new(Mutex::new(InstrumentStatus::new()));
