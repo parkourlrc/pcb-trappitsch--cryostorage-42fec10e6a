@@ -26,7 +26,6 @@ use crate::{
 /// etc., are still logged, but user cancellations, workflow errors are only displayed to the user.
 ///
 /// Arguments:
-/// - `inst_status`: Instrument status.
 /// - `auths`: Authorizations.
 pub async fn pump_chamber_workflow(auths: &Authorizations) {
     let inst_status = get_inst_status_wait().await;

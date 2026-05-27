@@ -332,9 +332,9 @@ prevents the transfer valve from closing before the VCT valves are closed.
   flowchart TD
     PR[Transfer sample] --> CCHK
     CCHK -->|No| Err
-    CCHK{{Is the cryocooler on?}} -->|Yes| TCHK
-    TCHK{{Sample temperature within safe range?}} -->|No| Err
-    TCHK -->|Yes| RDY
+    CCHK{{Is the cryocooler on?}} -->|Yes| SCHK
+    SCHK{{Is the sample safety check passing?}} -->|No| Err
+    SCHK -->|Yes| RDY
     RDY[/Set "VCT ready" status/] --> NAtt
     NAtt@{ shape: paper-tape, label: "Notify user to dock VCT and click attach button."} -->|Cancel| NRDY
     NRDY[/Unset "VCT ready" status/] --> Err
@@ -344,10 +344,10 @@ prevents the transfer valve from closing before the VCT valves are closed.
               p<sub>tr</sub> < 1e-5mbar"/]
     CHKOP -->|Timeout| NRDY
     CHKOP -->|True| OpTrV
-    OpTrV[/Open transfer valve/] --> NTr
-    NTr@{ shape: paper-tape, label: "Notify user to transfer sample and when done retract arm and press detach."} --> |Next| WaitForDet
-    WaitForDet[/Wait for detach: no time limit\] -->|Cancel| Err
-    WaitForDet --> |True| ClTr
+    OpTrV[/Open transfer valve/] --> WaitForDet
+    WaitForDet[/Wait for detach: no time limit; instruct user to transfer sample, retract arm, click detach.\] -->|Cancel| NRDY
+    WaitForDet --> |True| NRDYF
+    NRDYF[/Unset "VCT ready" status/] --> ClTr
 
     subgraph Level3 [Final]
       Err[/Abort/]

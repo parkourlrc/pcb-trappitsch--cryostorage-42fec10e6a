@@ -30,6 +30,7 @@ use crate::{
         baking::set_baking,
         cooler::set_cooler,
         pump_chamber::pump_chamber_workflow,
+        sample_transfer::sample_transfer_workflow,
         valves::{set_pump_valve, set_transfer_valve},
         vent_chamber::vent_chamber_workflow,
     },
@@ -40,6 +41,7 @@ mod cooler;
 mod equalize_pressure;
 mod progress_windows;
 mod pump_chamber;
+mod sample_transfer;
 mod timer;
 mod valves;
 mod vent_chamber;
@@ -133,7 +135,7 @@ pub async fn workflow_task(mut rx_wf: mpsc::Receiver<WorkflowCommands>) {
                         };
                     },
                     WorkflowCommands::StartSampleTransfer => {
-                        println!("Starting a new sample transfer... TODO!");
+                        sample_transfer_workflow(&auths).await;
                     }
                 }
             }

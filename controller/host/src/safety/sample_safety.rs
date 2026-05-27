@@ -50,6 +50,40 @@ pub fn sample_safety(inst_stat: &InstrumentStatus, max_safe_sample_temp: &Temper
         return;
     }
 
+    if let Err(err_msg) = check_sample_safe(inst_stat, max_safe_sample_temp) {
+        buzzer().turn_on();
+
+        // If UI is not yet set, the alarm will trigger again the next time around.
+        if let Some(ui) = UI.get() {
+            ui.upgrade_in_event_loop(move |_| {
+                if let Err(e_show) = show_alarm_dialog(err_msg, Some(&IS_ALARM_MUTED)) {
+                    log::err_now!("Failed to show alarm dialog: {}", e_show);
+                };
+            })
+            .expect("UI must be alive");
+        }
+    }
+}
+
+/// Routine to check if the sample is actually safe.
+///
+/// Returns:
+/// - Ok(()) if the sample is safe.
+/// - Err() describing the problem (user displayable) if the sample is not safe.
+pub fn check_sample_safe(
+    inst_stat: &InstrumentStatus,
+    max_safe_sample_temp: &Temperature,
+) -> Result<(), String> {
+    let wf = inst_stat.is_water_flow_ok();
+    let ip = inst_stat.is_ion_pump_on();
+    let ps = inst_stat.is_pumpstand_on();
+    let sample_temp_curr = inst_stat.get_sample_temperature();
+    let sample_temp_chk = sample_temp_curr < *max_safe_sample_temp;
+
+    if wf && ip && ps && sample_temp_chk {
+        return Ok(());
+    }
+
     // create the failure string:
     let mut err_msg = String::from(
         "The following component(s) have failed, which puts the sample in jeopardy.\n",
@@ -70,16 +104,5 @@ pub fn sample_safety(inst_stat: &InstrumentStatus, max_safe_sample_temp: &Temper
             max_safe_sample_temp.as_kelvin()
         ));
     }
-
-    buzzer().turn_on();
-
-    // If UI is not yet set, the alarm will trigger again the next time around.
-    if let Some(ui) = UI.get() {
-        ui.upgrade_in_event_loop(move |_| {
-            if let Err(e_show) = show_alarm_dialog(err_msg, Some(&IS_ALARM_MUTED)) {
-                log::err_now!("Failed to show alarm dialog: {}", e_show);
-            };
-        })
-        .expect("UI must be alive");
-    }
+    Err(err_msg)
 }

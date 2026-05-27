@@ -217,6 +217,7 @@ pub struct Authorizations {
     pub vent_chamber: VentChamberAuthorization,
     pub pump_chamber: PumpChamberAuthorization,
     pub equalize_pressures: EqualizePressureAuthorization,
+    pub sample_transfer: SampleTransferAuthorization,
 }
 
 impl Default for Authorizations {
@@ -228,6 +229,7 @@ impl Default for Authorizations {
             vent_chamber: VentChamberAuthorization::default(),
             pump_chamber: PumpChamberAuthorization::default(),
             equalize_pressures: EqualizePressureAuthorization::default(),
+            sample_transfer: SampleTransferAuthorization::default(),
         }
     }
 }
@@ -405,6 +407,30 @@ impl Default for SafetyWarnings {
     fn default() -> Self {
         Self {
             max_safe_sample_temperature: Temperature::from_kelvin(130.),
+        }
+    }
+}
+
+/// Authorizations specific to the sample transfer workflow.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SampleTransferAuthorization {
+    __doc_timer: String,
+    pub timer: Duration,
+    __doc_pressure_max: String,
+    pub pressure_max: Pressure,
+}
+
+impl Default for SampleTransferAuthorization {
+    fn default() -> Self {
+        Self {
+            __doc_timer: String::from(
+                "Max duration to check for pressure and VCT valve status to open transfer valve.",
+            ),
+            timer: Duration::from_mins(10),
+            __doc_pressure_max: String::from(
+                "Transfer system pressure must be below this limit to open transfer valve.",
+            ),
+            pressure_max: Pressure::from_millibars(0.00001),
         }
     }
 }

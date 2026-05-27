@@ -4,7 +4,10 @@ use std::time::Duration;
 
 use anyhow::{Result, anyhow, bail};
 use slint::{ComponentHandle, Weak};
-use tokio::sync::{mpsc, oneshot};
+use tokio::{
+    sync::{mpsc, oneshot},
+    time::sleep,
+};
 
 use crate::{
     app::{ProgressWindow, ProgressWindowLogic, get_ui_wait},
@@ -135,6 +138,54 @@ impl WorkflowProgress {
                             }
                         },
                         None => break,
+                    }
+                },
+                _ = self.recv() => {
+                    break;
+                },
+                _ = rx_shutdown.recv() => {
+                    self.close();
+                    bail!("Program shutdown received");
+                },
+            }
+        }
+
+        // Final chance for the check to succeed.
+        self.set_buttons(WorkflowProgressButtons::default());
+        self.update_timer(None);
+        if check() {
+            Ok(())
+        } else {
+            bail!("Check failed.")
+        }
+    }
+
+    /// Check for a condition without a timer (infinite time)
+    ///
+    /// The only button enabled in this scenario is the cancel button.
+    ///
+    /// Arguments:
+    /// - `msg`: Message to display.
+    /// - `check`: Closure that returns `true`` if the check succeeds and `false` otherwise.
+    ///
+    /// Return:
+    /// - Ok(()) If the check has succeeded.
+    /// - Err(): Cancel pressed and check failed, program shut down.
+    pub async fn check_for_infinite_time<F>(&mut self, msg: &str, check: F) -> Result<()>
+    where
+        F: Fn() -> bool + Send + 'static,
+    {
+        let mut rx_shutdown = crate::HALT_SENDER.get().unwrap().subscribe();
+
+        self.set_buttons(WorkflowProgressButtons::new().enable_cancel());
+        self.set_message(msg);
+
+        loop {
+            tokio::select! {
+                _ = sleep(Duration::from_secs(1)) => {
+                    if check() {
+                        self.set_buttons(WorkflowProgressButtons::default());
+                        return Ok(());
                     }
                 },
                 _ = self.recv() => {
