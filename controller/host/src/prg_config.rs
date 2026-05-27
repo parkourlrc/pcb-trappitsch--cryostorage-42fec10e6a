@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     ARCHIVE_FOLDER, CONFIG_FOLDER,
-    controller::ControllerConfig,
+    connections::PoststationAdapter,
     instruments::{
         cryocooler::CryoCoolerConfig, hi_cube::PfeifferHiCubeConf, ion_pump::IonPumpConfig,
         lakeshore_temp::LakeshoreTempConfig, omnicontrol::OmniControlConfig,
@@ -30,7 +30,7 @@ pub struct PrgConfig {
     admin_pin: String,
     authorizations: Authorizations,
     agilent_ion_pump: IonPumpConfig,
-    controller_config: ControllerConfig,
+    controller_config: PoststationAdapter,
     pfeiffer_hicube: PfeifferHiCubeConf,
     pfeiffer_omnicontrol: OmniControlConfig,
     samples: Samples,
@@ -54,7 +54,7 @@ impl PrgConfig {
             admin_pin: String::from("1234"),
             authorizations: Authorizations::default(),
             agilent_ion_pump: IonPumpConfig::default(),
-            controller_config: ControllerConfig::default(),
+            controller_config: PoststationAdapter::default(),
             pfeiffer_hicube: PfeifferHiCubeConf::default(),
             pfeiffer_omnicontrol: OmniControlConfig::default(),
             samples: Samples::new(),
@@ -135,7 +135,7 @@ impl PrgConfig {
     }
 
     /// Get a clone of the controller configuration.
-    pub fn get_controller_config(&self) -> ControllerConfig {
+    pub fn get_controller_config(&self) -> PoststationAdapter {
         self.controller_config.clone()
     }
 

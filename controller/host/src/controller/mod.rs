@@ -3,7 +3,6 @@ use std::time::{self, Duration};
 
 use icd::{BakingState, BcInstStatus, LightState, ValveState, VctHandshake};
 use poststation_sdk::{PoststationClient, connect};
-use serde::{Deserialize, Serialize};
 use tokio::{
     sync::{OnceCell, mpsc},
     task::JoinHandle,
@@ -52,7 +51,7 @@ pub async fn start_controller_tasks(
 
     let tic = time::Instant::now();
     let ps_client = loop {
-        if let Ok(conn) = connect(&config.address).await {
+        if let Ok(conn) = connect(&config.get_address()).await {
             break Some(conn);
         };
 
@@ -67,7 +66,7 @@ pub async fn start_controller_tasks(
     let ps_client = match ps_client {
         Some(client) => client,
         None => {
-            log::err!("Failed to connect to poststation at '{}'. Is poststation running? Restart the program.", { config.address }).await;
+            log::err!("Failed to connect to poststation at '{}'. Is poststation running? Restart the program.", { config.get_address()}).await;
             return (tokio::spawn(async {}), tokio::spawn(async {}));
         }
     };
@@ -130,11 +129,11 @@ pub async fn controller_task(cntrl: ControllerClient, mut rx: mpsc::Receiver<Con
                         cntrl.baking(state).await;
                     }
                     ControllerCommands::PumpValve(state) => {
-                        inst_status.lock().expect("Poisoned").set_valve_pump_call(state.clone());
+                        inst_status.lock().expect("Poisoned").set_valve_pump_call(state);
                         cntrl.pump_valve(state).await;
                     }
                     ControllerCommands::TransferValve(state) => {
-                        inst_status.lock().expect("Poisoned").set_valve_transfer_call(state.clone());
+                        inst_status.lock().expect("Poisoned").set_valve_transfer_call(state);
                         cntrl.transfer_valve(state).await;
                     }
                     ControllerCommands::VctHandshake(handshake) => {
@@ -227,23 +226,5 @@ pub fn send_cntrl_cmd_now(cmd: ControllerCommands) {
     let sender = get_cntrl_cmd_sender();
     if let Err(e) = sender.try_send(cmd) {
         log::err_now!("Failed to send controller command now: {}", e);
-    }
-}
-
-/// A structure that holds the configuration for the controller.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ControllerConfig {
-    /// The product name that is displayed in poststation.
-    pub product_name: String,
-    /// Address and port of the poststation serve.
-    pub address: String,
-}
-
-impl Default for ControllerConfig {
-    fn default() -> Self {
-        Self {
-            product_name: String::from("Cryostorage Controller"),
-            address: String::from("127.0.0.1:51837"),
-        }
     }
 }

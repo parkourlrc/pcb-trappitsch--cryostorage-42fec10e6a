@@ -53,10 +53,19 @@ impl Default for TcpIpAdapter {
 /// The adapter for connecting to the poststation server.
 ///
 /// A combination of the TCP/IP adapter and a serial number of the device.
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PoststationAdapter {
-    pub serial_number: u64,
+    pub product_name: String,
     pub tcp_ip: TcpIpAdapter,
+}
+
+impl Default for PoststationAdapter {
+    fn default() -> Self {
+        Self {
+            product_name: String::from("Cryostorage Controller"),
+            tcp_ip: TcpIpAdapter::new_from_str("127.0.0.1:51837"),
+        }
+    }
 }
 
 impl PoststationAdapter {
@@ -76,5 +85,12 @@ mod tests {
             port: 4001,
         };
         assert_eq!(adapter.get_address(), "192.168.1.100:4001");
+    }
+
+    #[test]
+    fn test_tcp_ip_adapter_from_str() {
+        let addr = "127.0.0.3:5555";
+        let adapter = TcpIpAdapter::new_from_str(addr);
+        assert_eq!(adapter.get_address(), addr);
     }
 }
