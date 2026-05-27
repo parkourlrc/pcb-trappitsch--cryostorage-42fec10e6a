@@ -309,3 +309,48 @@ In the "vent" workflow, this message has already been given before.
       Err[/Abort/]
     end
 ```
+
+## Transfer a sample
+
+The following workflow shows how a sample is transferred.
+The temperature check of the sample must be below the warning temperature,
+i.e., the temperature at which the software safety would kick in,
+see [the safety chapter](./safety.md).
+
+The timer to pump the gap and transfer should never be reached
+and represents a maximum limit.
+If the pressure is not good within these 10 minutes,
+there might be a leak or something similar.
+
+The detach check contains no timeout.
+We will wait until the VCT is detached
+and then close the transfer valve.
+Note that the [hardware safety](./safety.md)
+prevents the transfer valve from closing before the VCT valves are closed.
+
+```mermaid
+  flowchart TD
+    PR[Transfer sample] --> CCHK
+    CCHK -->|No| Err
+    CCHK{{Is the cryocooler on?}} -->|Yes| TCHK
+    TCHK{{Sample temperature within safe range?}} -->|No| Err
+    TCHK -->|Yes| RDY
+    RDY[/Set "VCT ready" status/] --> NAtt
+    NAtt@{ shape: paper-tape, label: "Notify user to dock VCT and click attach button."} -->|Cancel| NRDY
+    NRDY[/Unset "VCT ready" status/] --> Err
+    NAtt -->|Next| CHKOP[\"Check for 10min
+              VCT valves open 
+              AND 
+              p<sub>tr</sub> < 1e-5mbar"/]
+    CHKOP -->|Timeout| NRDY
+    CHKOP -->|True| OpTrV
+    OpTrV[/Open transfer valve/] --> NTr
+    NTr@{ shape: paper-tape, label: "Notify user to transfer sample and when done retract arm and press detach."} --> |Next| WaitForDet
+    WaitForDet[/Wait for detach: no time limit\] -->|Cancel| Err
+    WaitForDet --> |True| ClTr
+
+    subgraph Level3 [Final]
+      Err[/Abort/]
+      ClTr[/Close transfer valve/]
+    end
+```
