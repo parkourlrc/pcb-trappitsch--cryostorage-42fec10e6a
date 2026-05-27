@@ -29,7 +29,7 @@ use sunpower_cryotelgt::CoolerState;
 use tokio::sync::{OnceCell, mpsc};
 
 use crate::{
-    app::{ValveOrPumpState, get_ui_wait},
+    app::get_ui_wait,
     dialog::error_dialog_helper,
     get_inst_status_wait, get_prg_conf_wait,
     instruments::{
@@ -42,6 +42,7 @@ use crate::{
     },
     log,
     safety::sample_safety,
+    status::PumpState,
 };
 
 pub mod cryocooler;
@@ -137,11 +138,11 @@ pub async fn instruments_task(mut rx_instr: mpsc::Receiver<InstrumentCommands>) 
     };
 
     let ion_pump_state = match ion_pump_inst.get_high_voltage() {
-        Ok(HvState::On) => ValveOrPumpState::OpenOrOn,
-        Ok(HvState::Off) => ValveOrPumpState::ClosedOrOff,
+        Ok(HvState::On) => PumpState::On,
+        Ok(HvState::Off) => PumpState::Off,
         Err(_) => {
             ion_pump_inst.reset_instrument();
-            ValveOrPumpState::UndefinedOrError
+            PumpState::Error
         }
     };
 
@@ -240,11 +241,11 @@ pub async fn instruments_task(mut rx_instr: mpsc::Receiver<InstrumentCommands>) 
 
                 // Get the status of the ion pump. Poll regularly in case it turned off.
                 let ion_pump_state = match ion_pump_inst.get_high_voltage() {
-                    Ok(HvState::On) => ValveOrPumpState::OpenOrOn,
-                    Ok(HvState::Off) => ValveOrPumpState::ClosedOrOff,
+                    Ok(HvState::On) => PumpState::On,
+                    Ok(HvState::Off) => PumpState::Off,
                     Err(_) => {
                         ion_pump_inst.reset_instrument();
-                        ValveOrPumpState::UndefinedOrError
+                        PumpState::Error
                     }
                 };
 
@@ -309,14 +310,14 @@ pub async fn instruments_task(mut rx_instr: mpsc::Receiver<InstrumentCommands>) 
                         let st = match ion_pump_inst.set_high_voltage(state.clone()) {
                             Ok(_) => {
                                 match state {
-                                    HvState::On => ValveOrPumpState::OpenOrOn,
-                                    HvState::Off => ValveOrPumpState::ClosedOrOff,
+                                    HvState::On => PumpState::On,
+                                    HvState::Off => PumpState::Off,
                                 }
                             },
                             Err(e) => {
                                 ion_pump_inst.reset_instrument();
                                 log::err!("Failed to set ion pump state: {}", e).await;
-                                ValveOrPumpState::UndefinedOrError
+                                PumpState::Error
                             }
                         };
                         inst_status.lock().expect("InstrumentStatus lock poisoned")

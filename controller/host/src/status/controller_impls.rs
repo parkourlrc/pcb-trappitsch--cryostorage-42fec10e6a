@@ -16,8 +16,8 @@ impl InstrumentStatus {
     /// If the status is set properly, this will return an `Ok(())`, otherwise an error.
     pub fn initialize_call_states_from_bc(&mut self) -> Result<()> {
         self.baking_call = self.baking_curr.clone();
-        self.valve_pump_call = self.valve_pump_curr.clone();
-        self.valve_transfer_call = self.valve_transfer_curr.clone();
+        self.valve_pump_call = self.valve_pump_curr;
+        self.valve_transfer_call = self.valve_transfer_curr;
 
         // set UI with buttons (baking is set from broadcast)
         let valve_pump_is_open = self.valve_pump_call.is_open();
@@ -97,12 +97,7 @@ impl InstrumentStatus {
 
             // Pump valve status
             let valve_pump_state = if self.valve_pump_call == self.valve_pump_curr {
-                match self.valve_pump_curr {
-                    ValveState::Open => ValveOrPumpState::OpenOrOn,
-                    ValveState::Closed => ValveOrPumpState::ClosedOrOff,
-                    // Undefined in call state only possible at startup.
-                    ValveState::Undefined => ValveOrPumpState::UndefinedOrError,
-                }
+                self.valve_pump_curr.into()
             } else {
                 match self.valve_pump_curr {
                     ValveState::Undefined => ValveOrPumpState::UndefinedOrError,
@@ -112,12 +107,7 @@ impl InstrumentStatus {
 
             // Transfer valve status
             let valve_transfer_state = if self.valve_transfer_call == self.valve_transfer_curr {
-                match self.valve_transfer_curr {
-                    ValveState::Open => ValveOrPumpState::OpenOrOn,
-                    ValveState::Closed => ValveOrPumpState::ClosedOrOff,
-                    // Undefined in call state only possible at startup.
-                    ValveState::Undefined => ValveOrPumpState::UndefinedOrError,
-                }
+                self.valve_transfer_curr.into()
             } else {
                 match self.valve_transfer_curr {
                     ValveState::Undefined => ValveOrPumpState::UndefinedOrError,

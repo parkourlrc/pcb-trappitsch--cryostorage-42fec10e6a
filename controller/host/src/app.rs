@@ -25,6 +25,7 @@ use crate::{
     prg_config::PrgConfig,
     safety::test_alarm,
     samples::get_sample_idx,
+    status::PumpState,
     workflows::{WorkflowCommands, send_workflow_command_now},
 };
 
@@ -443,8 +444,8 @@ impl InstrumentCommandHandler {
         self.ui.global::<Logic>().on_pump_stand_set_on({
             move |val| {
                 let state = match val {
-                    true => ValveOrPumpState::OpenOrOn,
-                    false => ValveOrPumpState::ClosedOrOff,
+                    true => PumpState::On,
+                    false => PumpState::Off,
                 };
                 send_hicube_command_now(HiCubeCommands::SetPumpStandState(state));
                 ui.unwrap().global::<Logic>().set_pump_stand_is_on(val);
@@ -467,8 +468,8 @@ impl InstrumentCommandHandler {
         self.ui.global::<Logic>().on_vent_valve_set_open({
             move |val| {
                 let state = match val {
-                    true => ValveOrPumpState::OpenOrOn,
-                    false => ValveOrPumpState::ClosedOrOff,
+                    true => ValveState::Open,
+                    false => ValveState::Closed,
                 };
                 send_hicube_command_now(HiCubeCommands::SetVentingValveState(state));
                 ui.unwrap().global::<Logic>().set_vent_valve_is_open(val);

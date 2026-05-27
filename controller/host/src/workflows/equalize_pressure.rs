@@ -7,12 +7,11 @@ use anyhow::{Result, anyhow};
 use icd::ValveState;
 
 use crate::{
-    app::ValveOrPumpState,
     controller::{ControllerCommands, send_cntrl_cmd},
     get_inst_status_wait,
     instruments::hi_cube::{HiCubeCommands, send_hicube_cmd_w_err},
     prg_config::Authorizations,
-    status::PressureReading,
+    status::{PressureReading, PumpState},
     workflows::{
         MSG_FILL_N2, progress_windows::WorkflowProgress, vent_chamber::stop_pumps_open_vv,
     },
@@ -76,10 +75,8 @@ pub async fn eq_pch_too_high(
             Ok(())
         }
         Err(_) => {
-            let _ = send_hicube_cmd_w_err(HiCubeCommands::SetVentingValveState(
-                ValveOrPumpState::ClosedOrOff,
-            ))
-            .await;
+            let _ =
+                send_hicube_cmd_w_err(HiCubeCommands::SetVentingValveState(ValveState::Open)).await;
             Err(anyhow!(
                 "Could not equalize the pressure within the given time. \
                 Closing vent valve and stopping here."
@@ -110,10 +107,7 @@ pub async fn eq_pch_too_low(wp: &mut WorkflowProgress, auths: &Authorizations) -
     let inst_status = get_inst_status_wait().await;
 
     // start the primary pump
-    send_hicube_cmd_w_err(HiCubeCommands::SetPumpStandState(
-        ValveOrPumpState::OpenOrOn,
-    ))
-    .await?;
+    send_hicube_cmd_w_err(HiCubeCommands::SetPumpStandState(PumpState::On)).await?;
 
     // set up the with the escape check and the time.
     let check = {
@@ -145,10 +139,7 @@ pub async fn eq_pch_too_low(wp: &mut WorkflowProgress, auths: &Authorizations) -
             Ok(())
         }
         Err(_) => {
-            let _ = send_hicube_cmd_w_err(HiCubeCommands::SetPumpStandState(
-                ValveOrPumpState::ClosedOrOff,
-            ))
-            .await;
+            let _ = send_hicube_cmd_w_err(HiCubeCommands::SetPumpStandState(PumpState::Off)).await;
             Err(anyhow!(
                 "Could not equalize the pressure within the given time. Turning the pump stand off."
             ))

@@ -4,19 +4,20 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 
+use icd::ValveState;
 use measurements::{Power, Pressure, Temperature};
 use pfeiffer_hicube::PumpStandState;
 use slint::ComponentHandle;
 use sunpower_cryotelgt::CoolerState;
 
 use crate::{
-    app::{Logic, PumpStandStateGUI, UI, ValveOrPumpState},
+    app::{Logic, PumpStandStateGUI, UI},
     instruments::omnicontrol::{Gauge, GaugeStatus},
     plots::{
         PressureDataPoint, PressurePlotCommands, TemperatureDataPoint, TemperaturePlotCommands,
         send_pressure_plot_cmd_now, send_temperature_plot_cmd_now,
     },
-    status::{InstrumentStatus, PressureReading},
+    status::{InstrumentStatus, PressureReading, PumpState},
 };
 
 impl InstrumentStatus {
@@ -54,16 +55,16 @@ impl InstrumentStatus {
     }
 
     /// Set the Pfeiffer HiCube vent valve state and update UI.
-    pub fn set_hicube_vent_valve_state_and_ui(&mut self, state: ValveOrPumpState) -> Result<()> {
+    pub fn set_hicube_vent_valve_state_and_ui(&mut self, state: ValveState) -> Result<()> {
         self.hi_cube_venting_valve = state;
-        let valve_is_open = matches!(state, ValveOrPumpState::OpenOrOn);
+        let valve_is_open = matches!(state, ValveState::Open);
 
         let ui = UI
             .get()
             .ok_or_else(|| anyhow::anyhow!("UI not set"))?
             .clone();
         ui.upgrade_in_event_loop(move |ui| {
-            ui.global::<Logic>().set_vent_valve_state(state);
+            ui.global::<Logic>().set_vent_valve_state(state.into());
             ui.global::<Logic>().set_vent_valve_is_open(valve_is_open);
         })?;
 
@@ -71,16 +72,16 @@ impl InstrumentStatus {
     }
 
     /// Set ion pump state and update UI.
-    pub fn set_ion_pump_state_and_ui(&mut self, state: ValveOrPumpState) -> Result<()> {
+    pub fn set_ion_pump_state_and_ui(&mut self, state: PumpState) -> Result<()> {
         self.ion_pump_state = state;
 
-        let ion_pump_switch_state = matches!(state, ValveOrPumpState::OpenOrOn);
+        let ion_pump_switch_state = matches!(state, PumpState::On);
         let ui = UI
             .get()
             .ok_or_else(|| anyhow::anyhow!("UI not set"))?
             .clone();
         ui.upgrade_in_event_loop(move |ui| {
-            ui.global::<Logic>().set_ion_pump_state(state);
+            ui.global::<Logic>().set_ion_pump_state(state.into());
             ui.global::<Logic>()
                 .set_ion_pump_is_on(ion_pump_switch_state);
         })?;

@@ -1,15 +1,15 @@
 //! Workflow for pumping the chamber.
 
 use anyhow::anyhow;
+use icd::ValveState;
 
 use std::sync::Arc;
 
 use crate::{
-    app::ValveOrPumpState,
     get_inst_status_wait,
     instruments::hi_cube::{HiCubeCommands, send_hicube_cmd_w_err},
     prg_config::Authorizations,
-    status::PressureReading,
+    status::{PressureReading, PumpState},
     workflows::{
         equalize_pressure::{eq_pch_too_high, eq_pch_too_low},
         progress_windows::WorkflowProgress,
@@ -63,11 +63,9 @@ pub async fn pump_chamber_workflow(auths: &Authorizations) {
                 // close vent valve if we are in p_ch >> p_tr and the outcome of the equalizing
                 // workflow was ok
                 if res.is_ok()
-                    && send_hicube_cmd_w_err(HiCubeCommands::SetVentingValveState(
-                        ValveOrPumpState::OpenOrOn,
-                    ))
-                    .await
-                    .is_err()
+                    && send_hicube_cmd_w_err(HiCubeCommands::SetVentingValveState(ValveState::Open))
+                        .await
+                        .is_err()
                 {
                     res = Err(anyhow!(
                         "Pressure in transfer and sample chamber was equalized but the vent valve could not be closed. \
@@ -85,11 +83,9 @@ pub async fn pump_chamber_workflow(auths: &Authorizations) {
         }
 
         // start primary pump.
-        if send_hicube_cmd_w_err(HiCubeCommands::SetPumpStandState(
-            ValveOrPumpState::OpenOrOn,
-        ))
-        .await
-        .is_err()
+        if send_hicube_cmd_w_err(HiCubeCommands::SetPumpStandState(PumpState::On))
+            .await
+            .is_err()
         {
             wp.finalize("Could not start primary pump.", true).await;
             return;
@@ -123,11 +119,9 @@ pub async fn pump_chamber_workflow(auths: &Authorizations) {
             );
 
             // turn pump stand off.
-            if send_hicube_cmd_w_err(HiCubeCommands::SetPumpStandState(
-                ValveOrPumpState::OpenOrOn,
-            ))
-            .await
-            .is_err()
+            if send_hicube_cmd_w_err(HiCubeCommands::SetPumpStandState(PumpState::Off))
+                .await
+                .is_err()
             {
                 msg.push_str(" Could not turn primary pump off.");
             } else {

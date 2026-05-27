@@ -2,11 +2,11 @@
 
 use agilent_4uhv::HvState;
 use anyhow::{Result, anyhow};
+use icd::ValveState;
 
 use std::sync::Arc;
 
 use crate::{
-    app::ValveOrPumpState,
     get_inst_status_wait,
     instruments::{
         InstrumentCommands,
@@ -14,6 +14,7 @@ use crate::{
         send_instr_cmd_w_err,
     },
     prg_config::Authorizations,
+    status::PumpState,
     workflows::{
         MSG_FILL_N2,
         equalize_pressure::{eq_pch_too_high, eq_pch_too_low},
@@ -192,15 +193,9 @@ pub async fn stop_pumps_open_vv() -> Result<()> {
     // Stop the ion pump
     send_instr_cmd_w_err(InstrumentCommands::IonPumpState(HvState::Off)).await?;
     // Stop the primary pump
-    send_hicube_cmd_w_err(HiCubeCommands::SetPumpStandState(
-        ValveOrPumpState::ClosedOrOff,
-    ))
-    .await?;
+    send_hicube_cmd_w_err(HiCubeCommands::SetPumpStandState(PumpState::Off)).await?;
     // Open vent valve
-    send_hicube_cmd_w_err(HiCubeCommands::SetVentingValveState(
-        ValveOrPumpState::OpenOrOn,
-    ))
-    .await?;
+    send_hicube_cmd_w_err(HiCubeCommands::SetVentingValveState(ValveState::Open)).await?;
 
     Ok(())
 }

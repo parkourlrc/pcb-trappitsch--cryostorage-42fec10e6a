@@ -10,22 +10,23 @@
 
 use anyhow::Result;
 
+use icd::ValveState;
 use pfeiffer_hicube::{HiCubeClient, PumpStandState, Variables as HiCubeVariables, VentState};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
 use crate::{
-    app::ValveOrPumpState,
     connections::{TCP_IP_TIMEOUT, TcpIpAdapter},
     get_inst_status_wait, get_prg_conf_wait, log,
+    status::PumpState,
 };
 
 /// Commands that can be sent to the HiCube task.
 pub enum HiCubeCommands {
     /// Set the venting valve state.
-    SetVentingValveState(ValveOrPumpState),
+    SetVentingValveState(ValveState),
     /// Set the pump stand state.
-    SetPumpStandState(ValveOrPumpState),
+    SetPumpStandState(PumpState),
 }
 
 /// Async task to listen to the HiCube status.
@@ -77,8 +78,8 @@ pub async fn pfeiffer_hicube_task(rx_hicube: mpsc::Receiver<HiCubeCommands>) {
                     }
                     HiCubeVariables::Venting(state) => {
                         let st = match state {
-                            VentState::Enabled => ValveOrPumpState::OpenOrOn,
-                            VentState::Disabled => ValveOrPumpState::ClosedOrOff,
+                            VentState::Enabled => ValveState::Open,
+                            VentState::Disabled => ValveState::Closed,
                         };
                         if inst_status
                             .lock()
@@ -114,8 +115,8 @@ pub async fn pfeiffer_hicube_writing_task(
                 match cmd {
                     HiCubeCommands::SetVentingValveState(state) => {
                         let to_send = match state {
-                            ValveOrPumpState::OpenOrOn => HiCubeVariables::Venting(VentState::Enabled),
-                            ValveOrPumpState::ClosedOrOff => HiCubeVariables::Venting(VentState::Disabled),
+                            ValveState::Open => HiCubeVariables::Venting(VentState::Enabled),
+                            ValveState::Closed => HiCubeVariables::Venting(VentState::Disabled),
                             _ => {
                                 log::warning!("Received invalid venting valve state command to write to HiCube.").await;
                                 continue;
@@ -127,14 +128,14 @@ pub async fn pfeiffer_hicube_writing_task(
                     }
                     HiCubeCommands::SetPumpStandState(state) => {
                         match state {
-                            ValveOrPumpState::OpenOrOn => {
+                            PumpState::On=> {
                                 let to_send = HiCubeVariables::PumpStand(PumpStandState::On);
                                 if hicube.write(to_send).await.is_err() {
                                     log::err!("Failed to write pump stand state to HiCube.").await;
                                 };
                             }
                             // turn pump stand off by turning roughing and turbo pump to `false`.
-                            ValveOrPumpState::ClosedOrOff => {
+                            PumpState::Off => {
                                 let to_send = HiCubeVariables::PumpStand(PumpStandState::Off);
                                 if hicube.write(to_send).await.is_err() {
                                     log::err!("Failed to write pump stand state to HiCube.").await;

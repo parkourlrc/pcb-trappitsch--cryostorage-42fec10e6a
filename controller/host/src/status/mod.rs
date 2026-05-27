@@ -25,9 +25,9 @@ pub struct InstrumentStatus {
     chamber_light: LightState,
     cooler_state: CoolerState,
     flow_meter_curr: FlowMeterState,
-    ion_pump_state: ValveOrPumpState,
+    ion_pump_state: PumpState,
     hi_cube_pump_stand_state: PumpStandState,
-    hi_cube_venting_valve: ValveOrPumpState,
+    hi_cube_venting_valve: ValveState,
     power_cooler_current: Power,
     pressure_chamber_current: PressureReading,
     pressure_chamber_gauge: GaugeStatus,
@@ -54,8 +54,8 @@ impl InstrumentStatus {
             cooler_state: CoolerState::Disabled,
             flow_meter_curr: FlowMeterState::default(),
             hi_cube_pump_stand_state: PumpStandState::Other,
-            hi_cube_venting_valve: ValveOrPumpState::UndefinedOrError,
-            ion_pump_state: ValveOrPumpState::UndefinedOrError,
+            hi_cube_venting_valve: ValveState::default(),
+            ion_pump_state: PumpState::default(),
             power_cooler_current: Power::default(), // 0.0 W
             pressure_chamber_current: PressureReading::default(), // Off
             pressure_chamber_gauge: GaugeStatus::Off,
@@ -95,5 +95,39 @@ impl PressureReading {
             PressureReading::Error => "Error",
         };
         display_str.into()
+    }
+}
+
+/// Define a pump state.
+///
+/// A pump can generally be On, Off, or in an Undefined/Error state.
+#[derive(Debug, Default, Copy, Clone)]
+pub enum PumpState {
+    /// Pump is on.
+    On,
+    /// Pump is off.
+    Off,
+    /// Pump is undefined or erroring.
+    #[default]
+    Error,
+}
+
+impl From<PumpState> for ValveOrPumpState {
+    fn from(value: PumpState) -> Self {
+        match value {
+            PumpState::On => ValveOrPumpState::OpenOrOn,
+            PumpState::Off => ValveOrPumpState::ClosedOrOff,
+            PumpState::Error => ValveOrPumpState::SetDifferentFromCalled,
+        }
+    }
+}
+
+impl From<ValveState> for ValveOrPumpState {
+    fn from(value: ValveState) -> Self {
+        match value {
+            ValveState::Open => ValveOrPumpState::OpenOrOn,
+            ValveState::Closed => ValveOrPumpState::ClosedOrOff,
+            ValveState::Undefined => ValveOrPumpState::UndefinedOrError,
+        }
     }
 }

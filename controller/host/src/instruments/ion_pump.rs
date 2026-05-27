@@ -78,7 +78,7 @@ impl IonPumpInst {
 
     /// Set the High Voltage state of the configured channel.
     ///
-    /// As the argument we use a `ValveOrPumpState` enum, which is what we use in the program.
+    /// As the argument we use the `HvState` enum.
     pub fn set_high_voltage(&mut self, state: HvState) -> Result<()> {
         self.check_connection()?;
         if let Some(channel) = &mut self.channel {
