@@ -14,6 +14,7 @@ use sunpower_cryotelgt::CoolerState;
 use tokio::sync::{OnceCell, mpsc};
 
 use crate::{
+    PRG_CONF,
     controller::{ControllerCommands, send_cntrl_cmd_now},
     instruments::{
         InstrumentCommands,
@@ -24,35 +25,22 @@ use crate::{
     prg_config::PrgConfig,
     safety::test_alarm,
     samples::get_sample_idx,
-    status::InstrumentStatus,
-    workflows::{
-        WORKFLOW_COMMAND_SENDER, WorkflowCommands, send_workflow_command_now, workflow_task,
-    },
+    workflows::{WorkflowCommands, send_workflow_command_now},
 };
 
 slint::include_modules!();
 
 pub static UI: OnceCell<Weak<AppWindow>> = OnceCell::const_new();
 
-pub fn app_main(
-    conf: Arc<Mutex<PrgConfig>>,
-    inst_status: Arc<Mutex<InstrumentStatus>>,
-) -> Result<(), Box<dyn Error>> {
+pub fn app_main() -> Result<(), Box<dyn Error>> {
     let ui = AppWindow::new()?;
 
     let _ = UI.set(ui.as_weak());
-
-    // initialize the workflow channel and spawn the task.
-    let (tx_wf, rx_wf) = mpsc::channel(32);
-    WORKFLOW_COMMAND_SENDER
-        .set(tx_wf.clone())
-        .expect("Uninitialized");
-    let auths = conf.lock().expect("Poisoned").get_authorizations();
-    let _wf_taks = tokio::spawn(workflow_task(Arc::clone(&inst_status), auths, rx_wf));
+    let conf = PRG_CONF.get().expect("PrgConf is Initialized");
 
     // initialize the various GUI handlers
     let _controller_cmd_handler = ControllerCommandHandler::new(ui.as_weak());
-    let _gui_cmd_handler = GuiCommandHandler::new(ui.as_weak(), Arc::clone(&conf));
+    let _gui_cmd_handler = GuiCommandHandler::new(ui.as_weak(), Arc::clone(conf));
     let _instrument_cmd_handler = InstrumentCommandHandler::new(ui.as_weak());
 
     // Debug builds

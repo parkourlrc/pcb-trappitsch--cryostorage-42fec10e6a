@@ -27,6 +27,7 @@ use crate::{
     plots::{pressure_plot_task, temperature_plot_task},
     prg_config::PrgConfig,
     status::InstrumentStatus,
+    workflows::{WORKFLOW_COMMAND_SENDER, workflow_task},
 };
 
 pub static CONFIG_FOLDER: OnceCell<PathBuf> = OnceCell::const_new(); // config files, logs
@@ -95,11 +96,7 @@ async fn main() {
     instruments::INSTRUMENT_COMMAND_SENDER
         .set(tx_instr.clone())
         .expect("Uninitialized");
-    let instr_tsk = tokio::spawn(instruments_task(
-        Arc::clone(&conf),
-        Arc::clone(&inst_status),
-        rx_instr,
-    ));
+    let instr_tsk = tokio::spawn(instruments_task(Arc::clone(&inst_status), rx_instr));
 
     // HiCube task
     let (tx_hicube, rx_hicube) = mpsc::channel(32);
@@ -116,6 +113,14 @@ async fn main() {
         rx_hicube,
     ));
 
+    // initialize the workflow channel and spawn the task.
+    let (tx_wf, rx_wf) = mpsc::channel(32);
+    WORKFLOW_COMMAND_SENDER
+        .set(tx_wf.clone())
+        .expect("Uninitialized");
+    let auths = conf.lock().expect("Poisoned").get_authorizations();
+    let _wf_taks = tokio::spawn(workflow_task(Arc::clone(&inst_status), auths, rx_wf));
+
     log::info!(
         "Started cryostorage_host: Build Info - {}",
         env!("BUILD_INFO")
@@ -123,7 +128,7 @@ async fn main() {
     .await;
 
     // start the app
-    match app::app_main(Arc::clone(&conf), Arc::clone(&inst_status)) {
+    match app::app_main() {
         Ok(_) => {
             tx_halt.send(()).unwrap();
             let _ = tokio::join!(
@@ -156,4 +161,14 @@ fn init_config_folders() {
     ARCHIVE_FOLDER
         .set(archive_folder_pth)
         .expect("Uninitialized");
+}
+
+/// Wait for the program configuration to be available and then get it.
+pub async fn get_prg_conf_wait() -> Arc<Mutex<PrgConfig>> {
+    loop {
+        if let Some(prg_conf) = PRG_CONF.get() {
+            return Arc::clone(prg_conf);
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
 }

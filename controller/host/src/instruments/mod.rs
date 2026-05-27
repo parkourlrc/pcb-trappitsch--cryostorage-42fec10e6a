@@ -21,27 +21,33 @@
 
 use anyhow::{Result, anyhow};
 
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use agilent_4uhv::HvState;
 use measurements::{Power, Temperature};
 use sunpower_cryotelgt::CoolerState;
 use tokio::sync::{OnceCell, mpsc};
 
-use crate::app::{ValveOrPumpState, get_ui_wait};
-use crate::dialog::error_dialog_helper;
-use crate::instruments::cryocooler::CryoCoolerInst;
-use crate::instruments::hi_cube::HiCubeCommands;
-use crate::instruments::ion_pump::IonPumpInst;
-use crate::instruments::lakeshore_temp::LakeshoreTempInst;
-use crate::instruments::omnicontrol::{Gauge, GaugeStatus, OmniControlInst};
-use crate::instruments::utils::ThermocoupleChannelName;
-use crate::log;
-use crate::prg_config::PrgConfig;
-use crate::safety::sample_safety;
-use crate::status::InstrumentStatus;
+use crate::{
+    app::{ValveOrPumpState, get_ui_wait},
+    dialog::error_dialog_helper,
+    get_prg_conf_wait,
+    instruments::{
+        cryocooler::CryoCoolerInst,
+        hi_cube::HiCubeCommands,
+        ion_pump::IonPumpInst,
+        lakeshore_temp::LakeshoreTempInst,
+        omnicontrol::{Gauge, GaugeStatus, OmniControlInst},
+        utils::ThermocoupleChannelName,
+    },
+    log,
+    safety::sample_safety,
+    status::InstrumentStatus,
+};
 
 pub mod cryocooler;
 pub mod hi_cube;
@@ -70,10 +76,11 @@ pub enum InstrumentCommands {
 
 /// Monitoring task that polls the instruments periodically.
 pub async fn instruments_task(
-    prg_conf: Arc<Mutex<PrgConfig>>,
     inst_status: Arc<Mutex<InstrumentStatus>>,
     mut rx_instr: mpsc::Receiver<InstrumentCommands>,
 ) {
+    let prg_conf = get_prg_conf_wait().await;
+
     // Get all the instruments
     let mut lakeshore_temp_inst = {
         let conf = prg_conf
