@@ -38,6 +38,7 @@ pub const LOG_LEVEL_DISPLAY: log::Level = log::Level::Warning;
 
 pub static HALT_SENDER: OnceCell<broadcast::Sender<()>> = OnceCell::const_new();
 
+pub static INST_STATUS: OnceCell<Arc<Mutex<InstrumentStatus>>> = OnceCell::const_new();
 pub static PRG_CONF: OnceCell<Arc<Mutex<PrgConfig>>> = OnceCell::const_new();
 
 #[tokio::main]
@@ -51,6 +52,9 @@ async fn main() {
 
     // status of instrument
     let inst_status = Arc::new(Mutex::new(InstrumentStatus::new()));
+    INST_STATUS
+        .set(Arc::clone(&inst_status))
+        .expect("Unititialized");
 
     // Shutdown signal and receiver for tasks
     let (tx_halt, _) = broadcast::channel(1);
@@ -88,15 +92,14 @@ async fn main() {
         .lock()
         .expect("Locking config must work")
         .get_controller_config();
-    let (cntrl_tsk, cntrl_bc_listen) =
-        start_controller_tasks(controller_config, Arc::clone(&inst_status), rx_ctrl).await;
+    let (cntrl_tsk, cntrl_bc_listen) = start_controller_tasks(controller_config, rx_ctrl).await;
 
     // instruments monitoring task
     let (tx_instr, rx_instr) = mpsc::channel(32);
     instruments::INSTRUMENT_COMMAND_SENDER
         .set(tx_instr.clone())
         .expect("Uninitialized");
-    let instr_tsk = tokio::spawn(instruments_task(Arc::clone(&inst_status), rx_instr));
+    let instr_tsk = tokio::spawn(instruments_task(rx_instr));
 
     // HiCube task
     let (tx_hicube, rx_hicube) = mpsc::channel(32);
@@ -107,19 +110,14 @@ async fn main() {
         .lock()
         .expect("Locking config must work")
         .get_pfeiffer_hicube_config();
-    let hicube_task = tokio::spawn(pfeiffer_hicube_task(
-        hicube_conf,
-        Arc::clone(&inst_status),
-        rx_hicube,
-    ));
+    let hicube_task = tokio::spawn(pfeiffer_hicube_task(hicube_conf, rx_hicube));
 
     // initialize the workflow channel and spawn the task.
     let (tx_wf, rx_wf) = mpsc::channel(32);
     WORKFLOW_COMMAND_SENDER
         .set(tx_wf.clone())
         .expect("Uninitialized");
-    let auths = conf.lock().expect("Poisoned").get_authorizations();
-    let _wf_taks = tokio::spawn(workflow_task(Arc::clone(&inst_status), auths, rx_wf));
+    let _wf_taks = tokio::spawn(workflow_task(rx_wf));
 
     log::info!(
         "Started cryostorage_host: Build Info - {}",
@@ -161,6 +159,16 @@ fn init_config_folders() {
     ARCHIVE_FOLDER
         .set(archive_folder_pth)
         .expect("Uninitialized");
+}
+
+/// Wait for the program configuration to be available and then get it.
+pub async fn get_inst_status_wait() -> Arc<Mutex<InstrumentStatus>> {
+    loop {
+        if let Some(ist) = INST_STATUS.get() {
+            return Arc::clone(ist);
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
 }
 
 /// Wait for the program configuration to be available and then get it.

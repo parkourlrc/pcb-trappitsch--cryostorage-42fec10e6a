@@ -1,8 +1,5 @@
 //! This module handles communication with the controller firmware via poststation.
-use std::{
-    sync::{Arc, Mutex},
-    time::{self, Duration},
-};
+use std::time::{self, Duration};
 
 use icd::{BakingState, BcInstStatus, LightState, ValveState, VctHandshake};
 use poststation_sdk::{PoststationClient, connect};
@@ -13,7 +10,7 @@ use tokio::{
     time::sleep,
 };
 
-use crate::{app::get_ui_wait, log, status::InstrumentStatus};
+use crate::{app::get_ui_wait, get_inst_status_wait, log};
 
 mod client;
 
@@ -46,7 +43,6 @@ pub enum ControllerCommands {
 /// Tuple of joint handles for the two async tasks, which we will await later in main.
 pub async fn start_controller_tasks(
     config: ControllerConfig,
-    inst_status: Arc<Mutex<InstrumentStatus>>,
     rx_ctrl: mpsc::Receiver<ControllerCommands>,
 ) -> (JoinHandle<()>, JoinHandle<()>) {
     let tic = time::Instant::now();
@@ -91,29 +87,19 @@ pub async fn start_controller_tasks(
     let cntrl_client = ControllerClient::new(ps_client.clone(), serial);
 
     // Spawn the controller command handling task.
-    let cntrl_task = tokio::spawn(controller_task(
-        cntrl_client,
-        rx_ctrl,
-        Arc::clone(&inst_status),
-    ));
+    let cntrl_task = tokio::spawn(controller_task(cntrl_client, rx_ctrl));
 
     // Broadcast listener task.
-    let cntrl_bc_task = tokio::spawn(controller_broadcast_listener(
-        ps_client,
-        serial,
-        inst_status,
-    ));
+    let cntrl_bc_task = tokio::spawn(controller_broadcast_listener(ps_client, serial));
 
     (cntrl_task, cntrl_bc_task)
 }
 
 /// Task that communicates with the controller firmware via poststation.
-pub async fn controller_task(
-    cntrl: ControllerClient,
-    mut rx: mpsc::Receiver<ControllerCommands>,
-    inst_status: Arc<Mutex<InstrumentStatus>>,
-) {
+pub async fn controller_task(cntrl: ControllerClient, mut rx: mpsc::Receiver<ControllerCommands>) {
     let mut rx_shutdown = crate::HALT_SENDER.get().unwrap().subscribe();
+
+    let inst_status = get_inst_status_wait().await;
 
     loop {
         tokio::select! {
@@ -161,12 +147,10 @@ pub async fn controller_task(
 /// Task that listens to broadcast messages from the controller firmware via poststation.
 ///
 /// This task also updates the UI accordingly.
-pub async fn controller_broadcast_listener(
-    client: PoststationClient,
-    serial: u64,
-    inst_status: Arc<Mutex<InstrumentStatus>>,
-) {
+pub async fn controller_broadcast_listener(client: PoststationClient, serial: u64) {
     let mut rx_shutdown = crate::HALT_SENDER.get().unwrap().subscribe();
+
+    let inst_status = get_inst_status_wait().await;
 
     let mut run_initialize = true; // If true, runs initialize after broadcast
 

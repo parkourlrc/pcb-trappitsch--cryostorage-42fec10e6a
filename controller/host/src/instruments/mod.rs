@@ -21,11 +21,7 @@
 
 use anyhow::{Result, anyhow};
 
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-    time::Duration,
-};
+use std::{collections::HashMap, time::Duration};
 
 use agilent_4uhv::HvState;
 use measurements::{Power, Temperature};
@@ -35,7 +31,7 @@ use tokio::sync::{OnceCell, mpsc};
 use crate::{
     app::{ValveOrPumpState, get_ui_wait},
     dialog::error_dialog_helper,
-    get_prg_conf_wait,
+    get_inst_status_wait, get_prg_conf_wait,
     instruments::{
         cryocooler::CryoCoolerInst,
         hi_cube::HiCubeCommands,
@@ -46,7 +42,6 @@ use crate::{
     },
     log,
     safety::sample_safety,
-    status::InstrumentStatus,
 };
 
 pub mod cryocooler;
@@ -75,11 +70,10 @@ pub enum InstrumentCommands {
 }
 
 /// Monitoring task that polls the instruments periodically.
-pub async fn instruments_task(
-    inst_status: Arc<Mutex<InstrumentStatus>>,
-    mut rx_instr: mpsc::Receiver<InstrumentCommands>,
-) {
+pub async fn instruments_task(mut rx_instr: mpsc::Receiver<InstrumentCommands>) {
     let prg_conf = get_prg_conf_wait().await;
+
+    let inst_status = get_inst_status_wait().await;
 
     // Get all the instruments
     let mut lakeshore_temp_inst = {

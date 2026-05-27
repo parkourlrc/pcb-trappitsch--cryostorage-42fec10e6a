@@ -3,17 +3,17 @@
 use agilent_4uhv::HvState;
 use anyhow::{Result, anyhow};
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use crate::{
     app::ValveOrPumpState,
+    get_inst_status_wait,
     instruments::{
         InstrumentCommands,
         hi_cube::{HiCubeCommands, send_hicube_cmd_w_err},
         send_instr_cmd_w_err,
     },
     prg_config::Authorizations,
-    status::InstrumentStatus,
     workflows::{
         MSG_FILL_N2,
         equalize_pressure::{eq_pch_too_high, eq_pch_too_low},
@@ -34,10 +34,7 @@ use crate::{
 /// - `inst_status`: Instrument status.
 /// - `auths`: Authorizations.
 /// - `ui`: A weak handle to the main user interface.
-pub async fn vent_chamber_workflow(
-    inst_status: Arc<Mutex<InstrumentStatus>>,
-    auths: &Authorizations,
-) {
+pub async fn vent_chamber_workflow(auths: &Authorizations) {
     // THE DEMO
     // let desc =
     //     "Vent the chamber and transfer system. This process takes between 25 and 45 minutes.";
@@ -93,6 +90,7 @@ pub async fn vent_chamber_workflow(
     //     wp.finalize("WTF, again?????", true).await;
     // };
     // END DEMO
+    let inst_status = get_inst_status_wait().await;
 
     let desc =
         "Vent the chamber and transfer system. This process takes between 25 and 45 minutes.";
@@ -139,11 +137,9 @@ pub async fn vent_chamber_workflow(
                 "Authorization for opening the pump valve failed. \
                 Make sure everything is connected, running, and try again."
             )),
-            OpenValvePermissionError::ChamberPressureTooLow => {
-                eq_pch_too_low(&mut wp, Arc::clone(&inst_status), auths).await
-            }
+            OpenValvePermissionError::ChamberPressureTooLow => eq_pch_too_low(&mut wp, auths).await,
             OpenValvePermissionError::ChamberPressureTooHigh => {
-                eq_pch_too_high(&mut wp, Arc::clone(&inst_status), auths, false).await
+                eq_pch_too_high(&mut wp, auths, false).await
             }
         };
 

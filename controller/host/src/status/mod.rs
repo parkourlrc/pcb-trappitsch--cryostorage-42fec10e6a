@@ -18,6 +18,7 @@ mod instruments_impls;
 mod safety_impls;
 mod workflow_impls;
 
+#[derive(Debug)]
 pub struct InstrumentStatus {
     baking_call: BakingState,
     baking_curr: BakingState,

@@ -2,13 +2,14 @@
 
 use anyhow::anyhow;
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use crate::{
     app::ValveOrPumpState,
+    get_inst_status_wait,
     instruments::hi_cube::{HiCubeCommands, send_hicube_cmd_w_err},
     prg_config::Authorizations,
-    status::{InstrumentStatus, PressureReading},
+    status::PressureReading,
     workflows::{
         equalize_pressure::{eq_pch_too_high, eq_pch_too_low},
         progress_windows::WorkflowProgress,
@@ -27,10 +28,9 @@ use crate::{
 /// Arguments:
 /// - `inst_status`: Instrument status.
 /// - `auths`: Authorizations.
-pub async fn pump_chamber_workflow(
-    inst_status: Arc<Mutex<InstrumentStatus>>,
-    auths: &Authorizations,
-) {
+pub async fn pump_chamber_workflow(auths: &Authorizations) {
+    let inst_status = get_inst_status_wait().await;
+
     let desc = "Pumping the chamber and transfer system. This process can take up to around 3h.";
     let mut wp = WorkflowProgress::new("Venting the chamber", desc).await;
 
@@ -57,12 +57,9 @@ pub async fn pump_chamber_workflow(
                 "Authorization for opening the pump valve failed. \
                 Make sure everything is connected, running, and try again."
             )),
-            OpenValvePermissionError::ChamberPressureTooLow => {
-                eq_pch_too_low(&mut wp, Arc::clone(&inst_status), auths).await
-            }
+            OpenValvePermissionError::ChamberPressureTooLow => eq_pch_too_low(&mut wp, auths).await,
             OpenValvePermissionError::ChamberPressureTooHigh => {
-                let mut res =
-                    eq_pch_too_high(&mut wp, Arc::clone(&inst_status), auths, false).await;
+                let mut res = eq_pch_too_high(&mut wp, auths, false).await;
                 // close vent valve if we are in p_ch >> p_tr and the outcome of the equalizing
                 // workflow was ok
                 if res.is_ok()

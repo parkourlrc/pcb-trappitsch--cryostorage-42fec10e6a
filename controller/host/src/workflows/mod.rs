@@ -15,7 +15,7 @@
 //! - Block the UI?
 //! - How do we prevent long running background tasks from being started multiple times?
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use icd::{BakingState, ValveState};
 use slint::ComponentHandle;
@@ -25,9 +25,7 @@ use tokio::sync::{OnceCell, mpsc};
 use crate::{
     app::{Logic, get_ui_wait},
     dialog::error_dialog_helper,
-    log,
-    prg_config::Authorizations,
-    status::InstrumentStatus,
+    get_inst_status_wait, get_prg_conf_wait, log,
     workflows::{
         baking::set_baking,
         cooler::set_cooler,
@@ -74,13 +72,15 @@ pub enum WorkflowCommands {
 }
 
 /// The workflow task: Listen to WorkflowCommands and execute them.
-pub async fn workflow_task(
-    inst_status: Arc<Mutex<InstrumentStatus>>,
-    auths: Authorizations,
-    mut rx_wf: mpsc::Receiver<WorkflowCommands>,
-) {
+pub async fn workflow_task(mut rx_wf: mpsc::Receiver<WorkflowCommands>) {
     let mut rx_shutdown = crate::HALT_SENDER.get().unwrap().subscribe();
+
     let ui = get_ui_wait().await;
+
+    let inst_status = get_inst_status_wait().await;
+
+    let conf = get_prg_conf_wait().await;
+    let auths = conf.lock().expect("Poisoned").get_authorizations();
 
     loop {
         tokio::select! {
@@ -93,10 +93,10 @@ pub async fn workflow_task(
                         });
                     }
                     WorkflowCommands::ChamberPump => {
-                        pump_chamber_workflow(Arc::clone(&inst_status), &auths).await;
+                        pump_chamber_workflow(&auths).await;
                     },
                     WorkflowCommands::ChamberVent => {
-                        vent_chamber_workflow(Arc::clone(&inst_status), &auths).await;
+                        vent_chamber_workflow(&auths).await;
                     },
                     WorkflowCommands::CryoCoolerState(state) => {
                         set_cooler(Arc::clone(&inst_status), &auths, state).unwrap_or_else(|e| {

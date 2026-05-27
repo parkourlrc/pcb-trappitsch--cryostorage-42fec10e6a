@@ -3,17 +3,16 @@
 //! All of these shared workflows come into play when opening valves is not authorized. This means
 //! the pressure is to uneven between the two sides and must first be equalized.
 
-use std::sync::{Arc, Mutex};
-
 use anyhow::{Result, anyhow};
 use icd::ValveState;
 
 use crate::{
     app::ValveOrPumpState,
     controller::{ControllerCommands, send_cntrl_cmd},
+    get_inst_status_wait,
     instruments::hi_cube::{HiCubeCommands, send_hicube_cmd_w_err},
     prg_config::Authorizations,
-    status::{InstrumentStatus, PressureReading},
+    status::PressureReading,
     workflows::{
         MSG_FILL_N2, progress_windows::WorkflowProgress, vent_chamber::stop_pumps_open_vv,
     },
@@ -37,10 +36,11 @@ use crate::{
 /// display the message from the main routine.
 pub async fn eq_pch_too_high(
     wp: &mut WorkflowProgress,
-    inst_status: Arc<Mutex<InstrumentStatus>>,
     auths: &Authorizations,
     n2_note: bool,
 ) -> Result<()> {
+    let inst_status = get_inst_status_wait().await;
+
     // Display fill N2 message if requested. This can only be Ok(()) as no next button exists.
     if n2_note {
         let _ = wp.notify(MSG_FILL_N2, true).await;
@@ -106,11 +106,9 @@ pub async fn eq_pch_too_high(
 /// If any of these commands fail, an error is returned. If an `Ok(())` is returned, all has
 /// succeeded (including timers) and we will continue to work. The error can directly be used to
 /// display the message from the main routine.
-pub async fn eq_pch_too_low(
-    wp: &mut WorkflowProgress,
-    inst_status: Arc<Mutex<InstrumentStatus>>,
-    auths: &Authorizations,
-) -> Result<()> {
+pub async fn eq_pch_too_low(wp: &mut WorkflowProgress, auths: &Authorizations) -> Result<()> {
+    let inst_status = get_inst_status_wait().await;
+
     // start the primary pump
     send_hicube_cmd_w_err(HiCubeCommands::SetPumpStandState(
         ValveOrPumpState::OpenOrOn,

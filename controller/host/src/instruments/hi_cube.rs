@@ -10,8 +10,6 @@
 
 use anyhow::Result;
 
-use std::sync::{Arc, Mutex};
-
 use pfeiffer_hicube::{HiCubeClient, PumpStandState, Variables as HiCubeVariables, VentState};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
@@ -19,8 +17,7 @@ use tokio::sync::mpsc;
 use crate::{
     app::ValveOrPumpState,
     connections::{TCP_IP_TIMEOUT, TcpIpAdapter},
-    log,
-    status::InstrumentStatus,
+    get_inst_status_wait, log,
 };
 
 /// Commands that can be sent to the HiCube task.
@@ -36,10 +33,11 @@ pub enum HiCubeCommands {
 /// This task also will spawn the writing listener task, which listens to commands from the UI.
 pub async fn pfeiffer_hicube_task(
     conf: PfeifferHiCubeConf,
-    inst_status: Arc<Mutex<InstrumentStatus>>,
     rx_hicube: mpsc::Receiver<HiCubeCommands>,
 ) {
     let mut rx_shutdown = crate::HALT_SENDER.get().unwrap().subscribe();
+
+    let inst_status = get_inst_status_wait().await;
 
     // FIXME: Make sure this timeout is long enough with the actual instrument!
     let hicube_inst =
