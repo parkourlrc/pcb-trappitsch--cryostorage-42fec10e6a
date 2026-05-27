@@ -17,7 +17,7 @@ use tokio::sync::mpsc;
 use crate::{
     app::ValveOrPumpState,
     connections::{TCP_IP_TIMEOUT, TcpIpAdapter},
-    get_inst_status_wait, log,
+    get_inst_status_wait, get_prg_conf_wait, log,
 };
 
 /// Commands that can be sent to the HiCube task.
@@ -31,10 +31,13 @@ pub enum HiCubeCommands {
 /// Async task to listen to the HiCube status.
 ///
 /// This task also will spawn the writing listener task, which listens to commands from the UI.
-pub async fn pfeiffer_hicube_task(
-    conf: PfeifferHiCubeConf,
-    rx_hicube: mpsc::Receiver<HiCubeCommands>,
-) {
+pub async fn pfeiffer_hicube_task(rx_hicube: mpsc::Receiver<HiCubeCommands>) {
+    let conf = get_prg_conf_wait()
+        .await
+        .lock()
+        .expect("Locking config must work")
+        .get_pfeiffer_hicube_config();
+
     let mut rx_shutdown = crate::HALT_SENDER.get().unwrap().subscribe();
 
     let inst_status = get_inst_status_wait().await;
@@ -62,10 +65,13 @@ pub async fn pfeiffer_hicube_task(
             Some(message) = sub.recv() => {
                 match message {
                     HiCubeVariables::PumpStand(state) => {
-                        if inst_status                            .lock()
+                        #[allow(clippy::collapsible_match)] // Clarity
+                        if inst_status
+                            .lock()
                             .expect("Locking InstrumentStatus must work")
                             .set_hicube_pump_stand_state_and_ui(state)
-                            .is_err() {
+                            .is_err()
+                        {
                             log::err_now!("Could not set HiCube pump stand state to instrument status.");
                         };
                     }

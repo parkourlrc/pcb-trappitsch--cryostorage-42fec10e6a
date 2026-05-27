@@ -10,7 +10,7 @@ use tokio::{
     time::sleep,
 };
 
-use crate::{app::get_ui_wait, get_inst_status_wait, log};
+use crate::{app::get_ui_wait, get_inst_status_wait, get_prg_conf_wait, log};
 
 mod client;
 
@@ -42,9 +42,14 @@ pub enum ControllerCommands {
 /// # Returns
 /// Tuple of joint handles for the two async tasks, which we will await later in main.
 pub async fn start_controller_tasks(
-    config: ControllerConfig,
     rx_ctrl: mpsc::Receiver<ControllerCommands>,
 ) -> (JoinHandle<()>, JoinHandle<()>) {
+    let config = get_prg_conf_wait()
+        .await
+        .lock()
+        .expect("Locking config must work")
+        .get_controller_config();
+
     let tic = time::Instant::now();
     let ps_client = loop {
         if let Ok(conn) = connect(&config.address).await {

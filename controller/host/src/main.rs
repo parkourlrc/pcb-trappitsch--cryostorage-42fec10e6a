@@ -47,8 +47,8 @@ async fn main() {
     init_config_folders();
 
     // config
-    let conf = Arc::new(Mutex::new(prg_config::PrgConfig::try_new().unwrap()));
-    PRG_CONF.set(Arc::clone(&conf)).expect("Uninitialized");
+    let prg_conf = Arc::new(Mutex::new(prg_config::PrgConfig::try_new().unwrap()));
+    PRG_CONF.set(Arc::clone(&prg_conf)).expect("Uninitialized");
 
     // status of instrument
     let inst_status = Arc::new(Mutex::new(InstrumentStatus::new()));
@@ -88,11 +88,7 @@ async fn main() {
         .expect("Uninitialized");
 
     // controller
-    let controller_config = conf
-        .lock()
-        .expect("Locking config must work")
-        .get_controller_config();
-    let (cntrl_tsk, cntrl_bc_listen) = start_controller_tasks(controller_config, rx_ctrl).await;
+    let (cntrl_tsk, cntrl_bc_listen) = start_controller_tasks(rx_ctrl).await;
 
     // instruments monitoring task
     let (tx_instr, rx_instr) = mpsc::channel(32);
@@ -106,11 +102,7 @@ async fn main() {
     instruments::HICUBE_COMMAND_SENDER
         .set(tx_hicube.clone())
         .expect("Uninitialized");
-    let hicube_conf = conf
-        .lock()
-        .expect("Locking config must work")
-        .get_pfeiffer_hicube_config();
-    let hicube_task = tokio::spawn(pfeiffer_hicube_task(hicube_conf, rx_hicube));
+    let hicube_task = tokio::spawn(pfeiffer_hicube_task(rx_hicube));
 
     // initialize the workflow channel and spawn the task.
     let (tx_wf, rx_wf) = mpsc::channel(32);
