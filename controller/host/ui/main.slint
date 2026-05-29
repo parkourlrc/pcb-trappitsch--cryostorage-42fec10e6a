@@ -15,14 +15,8 @@ import { Logic } from "logic.slint";
 export { Logic, Keyboard, KeyboardLogic, Keypad, KeypadLogic, ErrorDialog, ProgressWindow, ProgressWindowLogic }
 
 export component AppWindow inherits Window {
-    in-out property <int> current_index: 0;
-    callback current_index_changed(int);
-
-    current_index_changed(new_index) => {
-        root.current_index = new_index;
-    }
-
     no-frame: true;
+    full-screen: true;
 
     x: 0px;
     y: 0px;
@@ -31,14 +25,23 @@ export component AppWindow inherits Window {
     height: Const.screen_height;
 
     // background: Palette.bg;
+    in-out property <int> current_index: 0;
+    callback current_index_changed(int);
 
-    Rectangle {
-        x: 0px;
-        y: 0px;
-        width: Const.screen_width;
-        height: Const.screen_height;
-        background: Palette.bg;
+    // Swap out subwindows
+    current_index_changed(new_index) => {
+        root.current_index = new_index;
     }
+
+    background: Palette.bg;
+
+    // Rectangle {
+    //     x: 0px;
+    //     y: 0px;
+    //     width: Const.screen_width;
+    //     height: Const.screen_height;
+    //     background: Palette.bg;
+    // }
 
     TabButton {
         index: 0;
