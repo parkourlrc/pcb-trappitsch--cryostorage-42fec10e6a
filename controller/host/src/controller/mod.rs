@@ -3,13 +3,17 @@ use std::time::{self, Duration};
 
 use icd::{BakingState, BcInstStatus, LightState, ValveState, VctHandshake};
 use poststation_sdk::{PoststationClient, connect};
+use slint::ComponentHandle;
 use tokio::{
     sync::{OnceCell, mpsc},
     task::JoinHandle,
     time::sleep,
 };
 
-use crate::{app::get_ui_wait, get_inst_status_wait, get_prg_conf_wait, log};
+use crate::{
+    app::{Logic, get_ui_wait},
+    get_inst_status_wait, get_prg_conf_wait, log,
+};
 
 mod client;
 
@@ -104,6 +108,7 @@ pub async fn controller_task(cntrl: ControllerClient, mut rx: mpsc::Receiver<Con
     let mut rx_shutdown = crate::HALT_SENDER.get().unwrap().subscribe();
 
     let inst_status = get_inst_status_wait().await;
+    let ui = get_ui_wait().await;
 
     loop {
         tokio::select! {
@@ -137,6 +142,12 @@ pub async fn controller_task(cntrl: ControllerClient, mut rx: mpsc::Receiver<Con
                         cntrl.transfer_valve(state).await;
                     }
                     ControllerCommands::VctHandshake(handshake) => {
+                        ui.upgrade_in_event_loop({
+                            let st = (&handshake).into();
+                            move |ui| {
+                                ui.global::<Logic>().set_ready_vct_attach(st)
+                            }
+                        }).expect("UI must be alive");
                         cntrl.vct_handshake(handshake).await;
                     }
                 }

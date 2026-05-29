@@ -32,7 +32,7 @@ impl VctState {
 
     /// Get if the dock gate valve is open.
     pub fn is_gate_open(&self) -> bool {
-        matches!(self.gate, VctConnectedState::Connected) 
+        matches!(self.gate, VctConnectedState::Connected)
     }
 }
 
@@ -47,4 +47,23 @@ pub enum VctHandshake {
     /// We are not ready for the attach procedure.
     #[default]
     NotReady,
+}
+
+impl From<bool> for VctHandshake {
+    fn from(value: bool) -> Self {
+        if value {
+            VctHandshake::Ready
+        } else {
+            VctHandshake::NotReady
+        }
+    }
+}
+
+impl From<&VctHandshake> for bool {
+    fn from(value: &VctHandshake) -> Self {
+        match value {
+            VctHandshake::Ready => true,
+            VctHandshake::NotReady => false,
+        }
+    }
 }

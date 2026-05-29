@@ -121,11 +121,10 @@ export global Logic {
     // VCT attached status: displays green box around VCT if attached
     in-out property <bool> is_vct_attached: true;
 
+    // Hanlde signal to Leica for VCT attachment
+    in-out property <bool> ready_vct_attach: false;
+    pure callback send_ready_vct_attach(bool);
+
     // Logging
     in-out property <[string]> log_messages: [];
-
-    // TODO: remove the following debug
-    pure callback test_button_pressed();
-    in-out property <string> test_button_text: "";
-    in-out property <bool> test_button_state: false;
 }

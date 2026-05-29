@@ -165,12 +165,13 @@ export component SettingsScreen inherits MyWindow {
         MyHorizontalLayout {
             MyVerticalLayout {
 
-                LongButton {
-                    text: "Admin mode";
-                    enabled: true;
-                    background: Logic.admin_mode ? Palette.button_on : Palette.button_off;
-                    clicked => {
-                        Logic.enter_admin_mode();
+                BigSwitch {
+                    title: "Ready for VCT?";
+                    right_side: Logic.ready_vct_attach;
+                    left_text: "No";
+                    right_text: "Yes";
+                    switched(send_ready) => {
+                        Logic.send_ready_vct_attach(send_ready);  // bool
                     }
                 }
 
@@ -182,53 +183,26 @@ export component SettingsScreen inherits MyWindow {
                 }
 
                 LongButton {
+                    text: "Admin mode";
+                    enabled: true;
+                    background: Logic.admin_mode ? Palette.button_on : Palette.button_off;
+                    clicked => {
+                        Logic.enter_admin_mode();
+                    }
+                }
+
+                LongButton {
                     text: "Exit program";
                     enabled: true;
                     clicked => {
                         Logic.close_program();
                     }
                 }
-
-                // FIXME: Test button to be removed
-                LongButton {
-                    text: Logic.test_button_text;
-                    clicked => {
-                        Logic.test_button_pressed();
-                    }
-                }
             }
-
-            // FIXME: Remove the following examples: commented out components as demos
-            // StatusOkErr {
-            //     title: "StatusOkErr: Err";
-            //     ok: false;
-            // }
-            //
-            // StatusOkErr {
-            //     title: "StatusOkErr: Ok"; }
-            //
-            // BigSwitch { }
-            //
-            // SmallSwitch { }
-            //
-            // InfoArea {
-            //     title: "Cold temperature";
-            //     text_color: Palette.blue;
-            // }
 
             MyVerticalLayout {
 
                 Baking { }
-
-                // HorizontalLayout {
-                //     alignment: end;
-                //     PictogramButton {
-                //         enabled: true;
-                //         clicked => {
-                //             Logic.close_program();
-                //         }
-                //     }
-                // }
             }
         }
 

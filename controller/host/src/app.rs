@@ -7,7 +7,7 @@ use std::{
 };
 
 use agilent_4uhv::HvState;
-use icd::{BakingState, LightState, ValveState, VctHandshake};
+use icd::{BakingState, LightState, ValveState};
 use measurements::Temperature;
 use slint::{Model, SharedString, Weak};
 use sunpower_cryotelgt::CoolerState;
@@ -168,31 +168,19 @@ impl GuiCommandHandler {
         }
 
         // buttons
-        self.test_button(); // FIXME: Delete
-        self.admin_mode();
+        self.ready_vct_attach();
         self.test_alarm();
+        self.admin_mode();
         self.close_button();
         self.edit_sample_name();
         self.sample_swiped();
     }
 
-    // FIXME: Delete
-    fn test_button(&self) {
-        self.ui
-            .global::<Logic>()
-            .set_test_button_text("Toggle VCT handshake".into());
-        let ui = self.ui.as_weak();
-        self.ui.global::<Logic>().on_test_button_pressed({
-            move || {
-                let ui = ui.unwrap();
-                let new_state = !ui.global::<Logic>().get_test_button_state();
-                let vct_state = if new_state {
-                    VctHandshake::Ready
-                } else {
-                    VctHandshake::NotReady
-                };
-                send_cntrl_cmd_now(ControllerCommands::VctHandshake(vct_state));
-                ui.global::<Logic>().set_test_button_state(new_state);
+    fn ready_vct_attach(&self) {
+        self.ui.global::<Logic>().on_send_ready_vct_attach({
+            move |st| {
+                send_cntrl_cmd_now(ControllerCommands::VctHandshake(st.into()));
+                // State of the switch is set where the command is forwarded to controller.
             }
         });
     }
