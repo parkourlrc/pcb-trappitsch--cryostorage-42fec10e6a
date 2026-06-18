@@ -71,6 +71,9 @@ pub fn show_alarm_dialog<D: Display>(
             dlg.unwrap().window().hide().unwrap();
             if let Some(a) = is_alarm_muted {
                 slint::spawn_local(async_compat::Compat::new(pause_sfty(a))).unwrap();
+            } else {
+                // Since no `is_alarm_muted` was provided, we just turn the alarm off for good
+                buzzer().turn_off();
             }
         }
     });
