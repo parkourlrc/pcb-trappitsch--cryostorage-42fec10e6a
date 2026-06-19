@@ -109,6 +109,10 @@ component BackspaceButton inherits ButtonStyle {
 export component Keyboard inherits Window {
     in-out property <string> message <=> KeyboardLogic.message;
     in-out property <string> text_entered <=> KeyboardLogic.text_entered;
+
+    full-screen: true;
+    always-on-top: true;
+
     y: 20px;
 
     height: 760px;

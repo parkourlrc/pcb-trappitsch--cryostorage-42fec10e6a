@@ -32,6 +32,10 @@ export global ProgressWindowLogic {
 }
 
 export component ProgressWindow inherits Window {
+
+    full-screen: true;
+    always-on-top: true;
+
     y: 20px;
 
     height: 760px;
@@ -71,21 +75,30 @@ export component ProgressWindow inherits Window {
             text: "Remaining time:\n" + ProgressWindowLogic.timer;
             horizontal-alignment: center;
         }
-
-        if ProgressWindowLogic.show_vacuum_plot: Rectangle {
-            background: white;
-
-            x: 100px;
-
-            width: 800px;
-            height: 400px;
-
-            // img := Image {
-            //     source: Logic.vacuum_plot;
-            //     horizontal-alignment: center;
-            // }
-
+        Text {
+            text: Logic.vacuum_plot.width + "x" + Logic.vacuum_plot.height;
         }
+
+        Text {
+            text: ProgressWindowLogic.show_vacuum_plot ? "yes" : "no";
+        }
+
+        if ProgressWindowLogic.show_vacuum_plot: Image {
+            source: Logic.vacuum_plot;
+        }
+
+        // if ProgressWindowLogic.show_vacuum_plot: Rectangle { background: white;
+        //
+        //     x: 100px;
+        //
+        //     width: 800px;
+        //     height: 400px;
+        //
+        //     Image {
+        //         source: Logic.vacuum_plot;
+        //         horizontal-alignment: center;
+        //     }
+        // }
 
         MyHorizontalLayout {
             alignment: center;

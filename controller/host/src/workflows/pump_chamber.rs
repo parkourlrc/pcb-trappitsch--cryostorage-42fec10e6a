@@ -31,7 +31,7 @@ pub async fn pump_chamber_workflow(auths: &Authorizations) {
     let inst_status = get_inst_status_wait().await;
 
     let desc = "Pumping the chamber and transfer system. This process can take up to around 3h.";
-    let mut wp = WorkflowProgress::new("Venting the chamber", desc).await;
+    let mut wp = WorkflowProgress::new("Pumping the chamber", desc).await;
 
     // Make sure user didn't press the button accidentally.
     if wp
@@ -80,72 +80,72 @@ pub async fn pump_chamber_workflow(auths: &Authorizations) {
             wp.finalize(&format!("{eq_err}"), true).await;
             return;
         }
+    }
 
-        // start primary pump.
-        if send_hicube_cmd_w_err(HiCubeCommands::SetPumpStandState(PumpState::On))
+    // start primary pump.
+    if send_hicube_cmd_w_err(HiCubeCommands::SetPumpStandState(PumpState::On))
+        .await
+        .is_err()
+    {
+        wp.finalize("Could not start primary pump.", true).await;
+        return;
+    };
+
+    // Wait for pre-defined time to reach a pressure limit for continuing.
+    let ppp_limit = auths.pump_chamber.pressure_limit_primary_pump;
+    let dur = auths.pump_chamber.timer_primary_pump;
+    let msg = format!(
+        "Waiting for chamber pressure to drop below {:e} mbar.",
+        ppp_limit.as_millibars()
+    );
+    let check = {
+        let inst_status = Arc::clone(&inst_status);
+        move || -> bool {
+            let (p_ch, _) = inst_status.lock().expect("Poisoned").get_pressures();
+            if let PressureReading::Value(p) = p_ch {
+                p < ppp_limit
+            } else {
+                false
+            }
+        }
+    };
+
+    wp.show_vacuum_plot(true);
+    if wp.check_for(dur, &msg, check).await.is_err() {
+        wp.show_vacuum_plot(false);
+        let mut msg = format!(
+            "Did not reach a pressure of {:e} mbar in the alotted time.",
+            ppp_limit.as_millibars()
+        );
+
+        // turn pump stand off.
+        if send_hicube_cmd_w_err(HiCubeCommands::SetPumpStandState(PumpState::Off))
             .await
             .is_err()
         {
-            wp.finalize("Could not start primary pump.", true).await;
-            return;
-        };
-
-        // Wait for pre-defined time to reach a pressure limit for continuing.
-        let ppp_limit = auths.pump_chamber.pressure_limit_primary_pump;
-        let dur = auths.pump_chamber.timer_primary_pump;
-        let msg = format!(
-            "Waiting for chamber pressure to drop below {:e} mbar.",
-            ppp_limit.as_millibars()
-        );
-        let check = {
-            let inst_status = Arc::clone(&inst_status);
-            move || -> bool {
-                let (p_ch, _) = inst_status.lock().expect("Poisoned").get_pressures();
-                if let PressureReading::Value(p) = p_ch {
-                    p < ppp_limit
-                } else {
-                    false
-                }
-            }
-        };
-
-        wp.show_vacuum_plot(true);
-        if wp.check_for(dur, &msg, check).await.is_err() {
-            wp.show_vacuum_plot(false);
-            let mut msg = format!(
-                "Did not reach a pressure of {:e} mbar in the alotted time.",
-                ppp_limit.as_millibars()
-            );
-
-            // turn pump stand off.
-            if send_hicube_cmd_w_err(HiCubeCommands::SetPumpStandState(PumpState::Off))
-                .await
-                .is_err()
-            {
-                msg.push_str(" Could not turn primary pump off.");
-            } else {
-                msg.push_str(" Turned primary pump off.")
-            }
-
-            wp.finalize(&msg, true).await;
-            return;
+            msg.push_str(" Could not turn primary pump off.");
+        } else {
+            msg.push_str(" Turned primary pump off.")
         }
 
-        // Now wait for a pre-defined time to turn on ion pump.
-        let dur = auths.pump_chamber.timer_ion_pump;
-        let msg = "Waiting until the timer expires to turn on the ion pump. \
+        wp.finalize(&msg, true).await;
+        return;
+    }
+
+    // Now wait for a pre-defined time to turn on ion pump.
+    let dur = auths.pump_chamber.timer_ion_pump;
+    let msg = "Waiting until the timer expires to turn on the ion pump. \
             If you press cancel before, the ion pump will not be turned on.";
 
-        if wp.wait_for(dur, msg).await.is_err() {
-            wp.finalize(
-                "Waiting for ion pump turn on was cancelled. The ion pump was not turned on.",
-                true,
-            )
+    if wp.wait_for(dur, msg).await.is_err() {
+        wp.finalize(
+            "Waiting for ion pump turn on was cancelled. The ion pump was not turned on.",
+            true,
+        )
+        .await;
+    } else {
+        wp.finalize("Pumping the chamber successfully completed.", false)
             .await;
-        } else {
-            wp.finalize("Pumping the chamber successfully completed.", false)
-                .await;
-        }
-        wp.show_vacuum_plot(false);
     }
+    wp.show_vacuum_plot(false);
 }

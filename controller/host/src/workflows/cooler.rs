@@ -31,9 +31,10 @@ fn get_start_cooler_permission(
         bail!("Baking is on: cannot start cooler.")
     };
 
-    if !inst_status.lock().expect("Poisoned").is_water_flow_ok() {
-        bail!("Water flow error: cannot start cooler.")
-    };
+    // FIXME: This needs to be reactivated when water flow read is good.
+    // if !inst_status.lock().expect("Poisoned").is_water_flow_ok() {
+    //     bail!("Water flow error: cannot start cooler.")
+    // };
 
     if p_chamber_mbar < auths.cryo_cooler.max_pressure_on_mbar {
         Ok(())
