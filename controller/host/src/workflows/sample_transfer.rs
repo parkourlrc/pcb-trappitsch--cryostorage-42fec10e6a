@@ -6,20 +6,19 @@ use icd::{ValveState, VctHandshake};
 
 use crate::{
     controller::{ControllerCommands, send_cntrl_cmd},
-    get_inst_status_wait, get_prg_conf_wait,
+    get_inst_status_wait,
     prg_config::Authorizations,
-    safety::check_sample_safe,
     status::PressureReading,
     workflows::progress_windows::WorkflowProgress,
 };
 
 /// Run the sample transfer workflow.
 ///
-/// WHile this is running, the UI is hidden by the progress window display.
+/// While this is running, the UI is hidden by the progress window display.
 ///
 /// Once the workflow has terminated, no result is returned. Errors are directly displayed to the
 /// user and must be acted on by the user accordingly. Errors in communicating with the devices,
-/// etc., are still logged, but user cancellations, workflow errors are only displaye dto the user.
+/// etc., are still logged, but user cancellations, workflow errors are only displayed to the user.
 pub async fn sample_transfer_workflow(auths: &Authorizations) {
     let inst_status = get_inst_status_wait().await;
 
@@ -36,35 +35,6 @@ pub async fn sample_transfer_workflow(auths: &Authorizations) {
         .is_err()
     {
         wp.close();
-        return;
-    }
-
-    // Check if the cryocooler is on.
-    if inst_status
-        .lock()
-        .expect("InstrumentStatus lock poisoned")
-        .is_cryo_cooler_off()
-    {
-        wp.finalize(
-            "Cryocooler must be on and at temperature before a sample transfer can be started.",
-            true,
-        )
-        .await;
-        return;
-    }
-
-    // Run sample safety check
-    let prg_conf = get_prg_conf_wait().await;
-    let (min_safe_temp, max_safe_temp) = prg_conf
-        .lock()
-        .expect("PrgConfig lock poisoned")
-        .get_safe_sample_temperatures();
-    let res = {
-        let inst_stat = inst_status.lock().expect("InstrumentStatus lock poisoned");
-        check_sample_safe(&inst_stat, (&min_safe_temp, &max_safe_temp))
-    };
-    if let Err(msg) = res {
-        wp.finalize(&msg, true).await;
         return;
     }
 

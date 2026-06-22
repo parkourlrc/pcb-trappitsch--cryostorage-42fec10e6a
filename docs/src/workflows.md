@@ -313,9 +313,12 @@ In the "vent" workflow, this message has already been given before.
 ## Transfer a sample
 
 The following workflow shows how a sample is transferred.
-The temperature check of the sample must be below the warning temperature,
-i.e., the temperature at which the software safety would kick in,
-see [the safety chapter](./safety.md).
+This workflow is fairly permissive,
+such that even if the cryo cooler has failed,
+a user can get there sample out and keep it save.
+The user is thus responsible to ensure
+that the cooler is on and that the temperature of the sample holder
+has reached the target temperature.
 
 The timer to pump the gap and transfer should never be reached
 and represents a maximum limit.
@@ -330,11 +333,7 @@ prevents the transfer valve from closing before the VCT valves are closed.
 
 ```mermaid
   flowchart TD
-    PR[Transfer sample] --> CCHK
-    CCHK -->|No| Err
-    CCHK{{Is the cryocooler on?}} -->|Yes| SCHK
-    SCHK{{Is the sample safety check passing?}} -->|No| Err
-    SCHK -->|Yes| RDY
+    PR[Transfer sample] --> RDY
     RDY[/Set "VCT ready" status/] --> NAtt
     NAtt@{ shape: paper-tape, label: "Notify user to dock VCT and click attach button."} -->|Cancel| NRDY
     NRDY[/Unset "VCT ready" status/] --> Err

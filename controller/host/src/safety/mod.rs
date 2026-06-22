@@ -8,7 +8,7 @@ mod sample_safety;
 mod test_alarm;
 
 pub use buzzer::buzzer;
-pub use sample_safety::{check_sample_safe, sample_safety};
+pub use sample_safety::sample_safety;
 pub use test_alarm::test_alarm;
 
 use anyhow::Result;
