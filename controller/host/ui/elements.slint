@@ -135,7 +135,7 @@ export component InfoAreaSmall inherits InfoArea {
 export component TemperatureArea inherits InfoAreaSmall {
     in property <int> temperature: 0;
 
-    text_color: (temperature > 0 && temperature < 120) ? Palette.blue : Palette.red;
+    text_color: (temperature > 0 && temperature < Logic.max_safe_temperature) ? Palette.blue : Palette.red;
     text: (temperature == 0) ? "Error" : temperature + " K";
 }
 

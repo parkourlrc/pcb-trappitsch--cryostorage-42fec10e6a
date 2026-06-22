@@ -44,6 +44,7 @@ export global Logic {
     // Cryocooler
     pure callback cryocooler_set_on(bool);
     in-out property <bool> cryocooler_is_on;
+    in-out property <float> max_safe_temperature: 300.0;  // above this temp, temp is red.
 
     // Flow meter
     in-out property <bool> water_flow_ok;

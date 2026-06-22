@@ -20,6 +20,7 @@
 //! freezes until a timeout is hit.
 
 use anyhow::{Result, anyhow};
+use slint::ComponentHandle;
 
 use std::{collections::HashMap, time::Duration};
 
@@ -29,7 +30,7 @@ use sunpower_cryotelgt::CoolerState;
 use tokio::sync::{OnceCell, mpsc};
 
 use crate::{
-    app::get_ui_wait,
+    app::{Logic, get_ui_wait},
     dialog::error_dialog_helper,
     get_inst_status_wait, get_prg_conf_wait,
     instruments::{
@@ -174,6 +175,14 @@ pub async fn instruments_task(mut rx_instr: mpsc::Receiver<InstrumentCommands>) 
         .lock()
         .expect("ProgramConfig lock poisoned")
         .get_safe_sample_temperatures();
+
+    // set the max temperature to the ui
+    let ui = get_ui_wait().await;
+    ui.upgrade_in_event_loop(move |ui| {
+        ui.global::<Logic>()
+            .set_max_safe_temperature(max_safe_sample_temp.as_kelvin() as f32);
+    })
+    .expect("UI is alive");
 
     // set later to a reasonable value
     let mut polling_interval = Duration::from_millis(1);
