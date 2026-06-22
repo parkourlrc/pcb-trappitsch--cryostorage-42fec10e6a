@@ -74,34 +74,6 @@ impl CryoCoolerInst {
         bail!("Cryocooler not connected (should be unreachable)");
     }
 
-    /// Get the setpoint temperature of the cryocooler.
-    pub fn get_setpoint_temperature(&mut self) -> Result<Temperature> {
-        self.check_connection()?;
-
-        if let Some(inst) = &mut self.instrument {
-            let set_temp = inst.get_temperature_setpoint()?;
-            return Ok(set_temp);
-        }
-
-        bail!("Cryocooler not connected (should be unreachable)");
-    }
-
-    /// Set the setpoint temperature of the cryocooler.
-    ///
-    /// This errors out if the temperature is < 50 K or > 200 K.
-    pub fn set_setpoint_temperature(&mut self, temperature: Temperature) -> Result<()> {
-        if temperature.as_kelvin() < 50.0 || temperature.as_kelvin() > 200.0 {
-            bail!("Setpoint temperature must be between 50 K and 200 K");
-        }
-
-        self.check_connection()?;
-
-        if let Some(inst) = &mut self.instrument {
-            inst.set_temperature_setpoint(temperature)?;
-        }
-        Ok(())
-    }
-
     /// Get the current state of the cryocooler.
     pub fn get_state(&mut self) -> Result<CoolerState> {
         self.check_connection()?;
@@ -116,14 +88,17 @@ impl CryoCoolerInst {
 
     /// Set the cryocooler state.
     ///
-    /// If the connection is lost when turning the cryocooler off, it will stay on digital input
-    /// mode, thus guaranteeing the safety of the cryocooler.
+    /// Enabling the cryocooler always sends the fixed temperature as well.
+    /// This is due to the fact that the cooler has too much power for th esystem.
     pub fn set_state(&mut self, state: CoolerState) -> Result<()> {
         self.check_connection()?;
+
+        // let setpoint_temperature = AUTH
 
         if let Some(inst) = &mut self.instrument {
             match state {
                 CoolerState::Enabled => {
+                    inst.set_temperature_setpoint(self.config.set_temperature)?;
                     inst.set_stop_mode(StopMode::DigitalInput)?; // external control
                 }
                 CoolerState::Disabled => {
@@ -177,6 +152,8 @@ pub struct CryoCoolerConfig {
     pub tcp_ip_adapter: TcpIpAdapter,
     /// Name of the temperature channel that is connected to the cryocooler.
     channel_name: Option<ThermocoupleChannelName>,
+    /// Fixed startup temperature: Temperature is controlled via lakeshore and heating cycle.
+    set_temperature: Temperature,
 }
 
 impl Default for CryoCoolerConfig {
@@ -184,6 +161,7 @@ impl Default for CryoCoolerConfig {
         Self {
             tcp_ip_adapter: TcpIpAdapter::new_from_str("192.168.1.2:4003"),
             channel_name: Some(ThermocoupleChannelName::Cooler),
+            set_temperature: Temperature::from_kelvin(120.),
         }
     }
 }

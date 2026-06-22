@@ -124,6 +124,18 @@ impl PrgConfig {
         Ok(())
     }
 
+    /// Sample setpoint temperature
+    pub fn get_samle_setpoint_temperature(&self) -> Temperature {
+        self.lakeshore_temperature.sample_temperature_heater
+    }
+
+    /// Set a new setpoint temperature and save the file.
+    pub fn set_sample_setpoint_temperature(&mut self, temperature: Temperature) -> Result<()> {
+        self.lakeshore_temperature.sample_temperature_heater = temperature;
+        self.save_to_file()?;
+        Ok(())
+    }
+
     /// Get a clone of the admin pin.
     pub fn get_admin_pin(&self) -> String {
         self.admin_pin.clone()

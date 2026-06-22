@@ -29,6 +29,8 @@
 
 #![deny(warnings, missing_docs)]
 
+// New types associated with Lakeshroe336 configuration.
+// pub mod ls_types;
 use std::{
     sync::{Arc, Mutex},
     time::Duration,
@@ -39,6 +41,8 @@ use instrumentrs::{Instrument, InstrumentError, InstrumentInterface, SerialInter
 use measurements::Temperature;
 
 use serialport::SerialPort;
+
+// use crate::ls_types::HeaterConfig;
 
 /// A SerialInterface for the Lakeshore336.
 ///
@@ -114,14 +118,18 @@ impl<T: InstrumentInterface> Lakeshore336<T> {
         self.query("*IDN?")
     }
 
-    /// Send a command to the instrument.
-    fn sendcmd(&mut self, cmd: &str) -> Result<(), InstrumentError> {
+    /// Send a command to the instrument
+    ///
+    /// TODO: THis is a total workaround, only for cryostorage chamber.
+    pub fn sendcmd(&mut self, cmd: &str) -> Result<(), InstrumentError> {
         let mut intf = self.interface.lock().expect("Mutex should not be poisoned");
         intf.sendcmd(cmd)
     }
 
     /// Query the instrument with a command and return the response as a String.
-    fn query(&mut self, cmd: &str) -> Result<String, InstrumentError> {
+    ///
+    /// TODO: This is a total workaround, only for cryostorage chamber.
+    pub fn query(&mut self, cmd: &str) -> Result<String, InstrumentError> {
         self.sendcmd(cmd)?;
         let mut intf = self.interface.lock().expect("Mutex should not be poisoned");
         intf.read_until_terminator()
@@ -160,9 +168,12 @@ impl<T: InstrumentInterface> Channel<T> {
     /// Note: If no sensor is connected, the input it disabled, etc., the instrument returns a
     /// reading of zero kelvin. In this case, we return a sensor error.
     pub fn get_temperature(&mut self) -> Result<Temperature, InstrumentError> {
-        let resp = self.query("KRDG?")?;
+        let cmd = format!("KRDG? {}", self.idx_mapper());
+        let resp = self.query(&cmd)?;
         let val = resp
             .trim()
+            .trim_start_matches(['+'])
+            .trim_end_matches(';')
             .parse::<f64>()
             .map_err(|_| InstrumentError::ResponseParseError(resp))?;
         if val == 0.0 {
@@ -188,13 +199,13 @@ impl<T: InstrumentInterface> Channel<T> {
     }
 
     /// Send a command for this instrument to an interface.
-    fn sendcmd(&mut self, cmd: &str) -> Result<(), InstrumentError> {
+    pub fn sendcmd(&mut self, cmd: &str) -> Result<(), InstrumentError> {
         let mut intf = self.interface.lock().expect("Mutex should not be poisoned");
         intf.sendcmd(format!("{}{}", cmd, self.idx_mapper()).as_str())
     }
 
     /// Query the instrument with a command and return the response as a String.
-    fn query(&mut self, cmd: &str) -> Result<String, InstrumentError> {
+    pub fn query(&mut self, cmd: &str) -> Result<String, InstrumentError> {
         self.sendcmd(cmd)?;
         let mut intf = self.interface.lock().expect("Mutex should not be poisoned");
         intf.read_until_terminator()

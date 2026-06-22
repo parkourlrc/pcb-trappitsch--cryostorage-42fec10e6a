@@ -163,8 +163,11 @@ pub trait InstrumentInterface {
             } else {
                 // This should be impossible, however, can happen in various cases, e.g., when
                 // pull-up resistors on an RS-485 line are not set correctly. Here, we want to
-                // print an error, but continue deciphering the package as it might be valid. 
-                eprintln!("Received non-UTF-8 byte from instrument: 0x{:02X}. Skipping byte.", single_buf[0]);
+                // print an error, but continue deciphering the package as it might be valid.
+                eprintln!(
+                    "Received non-UTF-8 byte from instrument: 0x{:02X}. Skipping byte.",
+                    single_buf[0]
+                );
                 continue;
             }
             if response.ends_with(&self.get_terminator()) {

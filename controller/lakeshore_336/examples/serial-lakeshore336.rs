@@ -12,9 +12,9 @@ fn main() {
 
     // Get channel A and channel C
     let mut cha = inst.get_channel(0).unwrap();
-    let mut chc = inst.get_channel(1).unwrap();
+    let mut chb = inst.get_channel(1).unwrap();
 
     // Query and print the temperature of channel A and channel C
     println!("Channel A temperature: {:?}", cha.get_temperature());
-    println!("Channel C temperature: {:?}", chc.get_temperature());
+    println!("Channel C temperature: {:?}", chb.get_temperature());
 }

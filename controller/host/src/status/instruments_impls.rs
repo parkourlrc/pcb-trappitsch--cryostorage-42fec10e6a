@@ -89,7 +89,14 @@ impl InstrumentStatus {
         Ok(())
     }
 
-    /// Set the setpoint temperature for the cooler and update UI.
+    /// Get the setpoint temperature of the sample.
+    pub fn get_temperature_setpoint(&self) -> Temperature {
+        self.temperature_setpoint
+    }
+
+    /// Set the setpoint temperature of the sample and update UI.
+    ///
+    /// This should set the temperature via the Lakeshore heating activation.
     pub fn set_temperature_setpoint_and_ui(&mut self, setpoint: Temperature) -> Result<()> {
         self.temperature_setpoint = setpoint;
 

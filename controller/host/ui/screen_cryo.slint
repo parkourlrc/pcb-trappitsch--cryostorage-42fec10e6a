@@ -11,7 +11,9 @@ import {
     MyHorizontalLayout,
     TemperatureArea,
     BigSwitch,
-    InfoAreaSmall, RegularButton, ShortButton,
+    InfoAreaSmall,
+    RegularButton,
+    ShortButton,
 } from "elements.slint";
 
 export component CryoScreen inherits MyWindow {
@@ -69,15 +71,15 @@ export component CryoScreen inherits MyWindow {
                 InfoAreaSmall {
                     title: "Target temperature";
                     text_color: (Logic.target_temp == 0) ? Palette.red : Palette.text;
-                    text: (Logic.target_temp == 0) ? "Error": Logic.target_temp + " K";
+                    text: (Logic.target_temp == 0) ? "Error" : Logic.target_temp + " K";
                 }
 
                 InfoAreaSmall {
-                    title: "Current power";
+                    title: "Cooler power";
                     text: Logic.current_power + " W";
                 }
 
-                ShortButton{
+                ShortButton {
                     text: "Set target temperature";
                     clicked => {
                         Logic.set_setpoint_temp();

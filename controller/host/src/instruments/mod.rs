@@ -61,14 +61,14 @@ pub static HICUBE_COMMAND_SENDER: OnceCell<mpsc::Sender<HiCubeCommands>> = OnceC
 
 /// Commands that can be sent to instruments.
 pub enum InstrumentCommands {
-    /// Set temperature of the cryocooler.
-    CryoCoolerSetpoint(Temperature),
     /// Turn the cryocooler on or off.
     CryoCoolerState(CoolerState),
     /// Set the state of the selected gauge to on or off.
     GaugeState((Gauge, GaugeStatus)),
     /// Turn the ion pump on or off.
     IonPumpState(HvState),
+    /// Set the target temperature of the sample via heating setting of Lakeshore controller.
+    SampleTargetTemperature(Temperature),
 }
 
 /// Monitoring task that polls the instruments periodically.
@@ -116,18 +116,11 @@ pub async fn instruments_task(mut rx_instr: mpsc::Receiver<InstrumentCommands>) 
 
     // Set the instrument initial states
     // cryocooler
-    let cooler_setpoint_temperature = match cryocooler_inst.get_setpoint_temperature() {
-        Ok(t) => t,
-        Err(e) => {
-            log::err!(
-                "Failed to set initial cryocooler setpoint temperature: {}",
-                e,
-            )
-            .await;
-            cryocooler_inst.reset_instrument();
-            Temperature::default()
-        }
-    };
+    // FIXME: This reads the last wanted setpoint temperature from the config file.
+    let sample_setpoint_temperature = inst_status
+        .lock()
+        .expect("InstStatus mutex poisoned")
+        .get_temperature_setpoint();
 
     let cooler_state = match cryocooler_inst.get_state() {
         Ok(s) => s,
@@ -152,7 +145,7 @@ pub async fn instruments_task(mut rx_instr: mpsc::Receiver<InstrumentCommands>) 
         let mut inst_status = inst_status.lock().expect("InstrumentStatus lock poisoned");
 
         if inst_status
-            .set_temperature_setpoint_and_ui(cooler_setpoint_temperature)
+            .set_temperature_setpoint_and_ui(sample_setpoint_temperature)
             .is_err()
         {
             log::err_now!("Failed to set initial cryocooler setpoint temperature in UI");
@@ -283,21 +276,40 @@ pub async fn instruments_task(mut rx_instr: mpsc::Receiver<InstrumentCommands>) 
             // Instrument command received
             Some(cmd) = rx_instr.recv() => {
                 match cmd {
-                    InstrumentCommands::CryoCoolerSetpoint(temperature) => {
-                        match cryocooler_inst.set_setpoint_temperature(temperature) {
-                            Ok(_) => {
-                                inst_status.lock().expect("InstrumentStatus lock poisoned")
-                                    .set_temperature_setpoint_and_ui(temperature)
-                                    .expect("UI set before this loop started.");
-                            },
-                            Err(e) => {
-                                log::err!("Failed to set cryocooler setpoint temperature: {}", e).await;
-                            }
+                    InstrumentCommands::SampleTargetTemperature(temperature) => {
+                        // range check
+                        if temperature < Temperature::from_kelvin(100.) || temperature > Temperature::from_kelvin(150.) {
+                            error_dialog_helper(
+                                anyhow!("The setpoint temperature {:.0} K is outside the valid range [100 K, 150 K].", temperature.as_kelvin())
+                            );
+                            continue;
+                        }
+
+                        // let's set it
+                        if prg_conf.lock().expect("PrgConf mutex poisoned").set_sample_setpoint_temperature(temperature).is_err() {
+                            log::err!("Failed to set new sample setpoint temperature to config file").await;
+                        }
+                        if lakeshore_temp_inst.set_heater_temperature(temperature).is_err() {
+                            log::err!("Failed to set new set tempreature to Lakeshore").await;
+                            return;
+                        }
+
+                        let res = inst_status.lock().expect("InstStatus Mutex poisoned.").set_temperature_setpoint_and_ui(temperature);
+                        if res.is_err() {
+                            log::err!("Failed to set new sample setpoint temperature to instrument status").await;
                         }
                     }
                     InstrumentCommands::CryoCoolerState(state) => {
                         match cryocooler_inst.set_state(state.clone()) {
                             Ok(_) => {
+                                let htr_res = match state {
+                                    CoolerState::Enabled => lakeshore_temp_inst.set_heater_on(),
+                                    CoolerState::Disabled => lakeshore_temp_inst.set_heater_off(),
+                                };
+
+                                if htr_res.is_err() {
+                                    log::err!("Failed to turn the Lakeshore heater on.").await;
+                                }
                                 inst_status.lock().expect("InstrumentStatus lock poisoned")
                                     .set_cooler_state_and_ui(state)
                                     .expect("UI set before this loop started.");

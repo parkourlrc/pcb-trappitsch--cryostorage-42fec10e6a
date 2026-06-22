@@ -86,6 +86,52 @@ impl LakeshoreTempInst {
         bail!("Lakeshore temperature controller not connected (should be unreachable)");
     }
 
+    /// Set the heater to the predefined value and the given temperature.
+    ///
+    /// FIXME: This is a temporary workaround as I don't have time right now to develop the driver
+    /// further.
+    pub fn set_heater_on(&mut self) -> Result<()> {
+        self.check_connection()?;
+
+        if let Some(inst) = self.instrument.as_mut() {
+            // Set the heater setup for output 1.
+            inst.sendcmd("HTRSET 1,1,4,0,2")?;
+            // set the output mode
+            inst.sendcmd("OUTMODE 1,1,1,0")?;
+            // Turn the heater on.
+            inst.sendcmd("RANGE 1,2")?;
+        }
+        Ok(())
+    }
+
+    /// Turn the heater off.
+    ///
+    /// FIXME: This is a temporary workaround as I don't have time right now to develop the driver
+    /// further.
+    pub fn set_heater_off(&mut self) -> Result<()> {
+        self.check_connection()?;
+
+        if let Some(inst) = self.instrument.as_mut() {
+            inst.sendcmd("RANGE 1,0")?;
+        }
+        Ok(())
+    }
+
+    /// Set the heater temperature.
+    ///
+    /// Sets the temperature that is stored in the program config to the instrument.
+    ///
+    /// FIXME: This is a temporary workaround as I don't have time right now to develop the driver
+    /// further.
+    pub fn set_heater_temperature(&mut self, temperature: Temperature) -> Result<()> {
+        self.check_connection()?;
+        if let Some(inst) = self.instrument.as_mut() {
+            let cmd = format!("SETP 1,{:.1}", temperature);
+            inst.sendcmd(&cmd)?;
+        }
+        Ok(())
+    }
+
     /// Reset the instrument to None, so that it reconnects on the next read.
     pub fn reset_instrument(&mut self) {
         self.instrument = None;
@@ -95,6 +141,8 @@ impl LakeshoreTempInst {
 /// Configuration to store for the Lakeshore temperature controller.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct LakeshoreTempConfig {
+    /// Target temperature for the heater.
+    pub sample_temperature_heater: Temperature,
     /// USB product info string to identify the device for automatic port detection.
     pub usb_prod_info: Option<String>,
     /// Channel 1/A name, or None if not present.
@@ -128,6 +176,7 @@ impl LakeshoreTempConfig {
 impl Default for LakeshoreTempConfig {
     fn default() -> Self {
         Self {
+            sample_temperature_heater: Temperature::from_kelvin(120.0),
             usb_prod_info: Some(String::from("Model 336 Temperature Controller")),
             channel_a_name: Some(ThermocoupleChannelName::Sample),
             channel_b_name: Some(ThermocoupleChannelName::Bridge),

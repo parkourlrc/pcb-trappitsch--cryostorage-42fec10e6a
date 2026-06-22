@@ -14,7 +14,7 @@ use sunpower_cryotelgt::CoolerState;
 use tokio::sync::{OnceCell, mpsc};
 
 use crate::{
-    PRG_CONF,
+    INST_STATUS, PRG_CONF,
     controller::{ControllerCommands, send_cntrl_cmd_now},
     instruments::{
         InstrumentCommands,
@@ -38,6 +38,13 @@ pub fn app_main() -> Result<(), Box<dyn Error>> {
 
     let _ = UI.set(ui.as_weak());
     let conf = PRG_CONF.get().expect("PrgConf is Initialized");
+
+    // initialize instrument status.
+    let inst_status = INST_STATUS.get().expect("InstStat must be initialized.");
+    inst_status
+        .lock()
+        .expect("InstStat mutex is poisoned")
+        .initialize();
 
     // initialize the various GUI handlers
     let _controller_cmd_handler = ControllerCommandHandler::new(ui.as_weak());
@@ -322,7 +329,7 @@ impl InstrumentCommandHandler {
     fn init(&self) {
         self.chamber_vacuum();
         self.cryocooler_set_on();
-        self.cryocooler_set_setpoint();
+        self.sample_temperature_setpoint();
         self.ion_pump_set_on();
         self.gauge_chamber_set_on();
         self.gauge_transfer_set_on();
@@ -345,7 +352,7 @@ impl InstrumentCommandHandler {
         });
     }
 
-    fn cryocooler_set_setpoint(&self) {
+    fn sample_temperature_setpoint(&self) {
         self.ui.global::<Logic>().on_set_setpoint_temp({
             move || {
                 let keypad = Keypad::new().unwrap();
@@ -364,7 +371,7 @@ impl InstrumentCommandHandler {
                     let keypad = keypad.as_weak();
                     move |setpoint| {
                         if let Ok(new_setpoint) = setpoint.as_str().parse::<f64>() {
-                            send_instr_cmd_now(InstrumentCommands::CryoCoolerSetpoint(
+                            send_instr_cmd_now(InstrumentCommands::SampleTargetTemperature(
                                 Temperature::from_kelvin(new_setpoint),
                             ));
                         }
