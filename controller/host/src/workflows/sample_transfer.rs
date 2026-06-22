@@ -55,13 +55,13 @@ pub async fn sample_transfer_workflow(auths: &Authorizations) {
 
     // Run sample safety check
     let prg_conf = get_prg_conf_wait().await;
-    let max_safe_temperature = prg_conf
+    let (min_safe_temp, max_safe_temp) = prg_conf
         .lock()
         .expect("PrgConfig lock poisoned")
-        .get_max_safe_sample_temperature();
+        .get_safe_sample_temperatures();
     let res = {
         let inst_stat = inst_status.lock().expect("InstrumentStatus lock poisoned");
-        check_sample_safe(&inst_stat, &max_safe_temperature)
+        check_sample_safe(&inst_stat, (&min_safe_temp, &max_safe_temp))
     };
     if let Err(msg) = res {
         wp.finalize(&msg, true).await;

@@ -150,8 +150,13 @@ impl PrgConfig {
     }
 
     /// Get the max safe sample temperature.
-    pub fn get_max_safe_sample_temperature(&self) -> Temperature {
-        self.safety_warnings.max_safe_sample_temperature
+    ///
+    /// Returns the minimum and maximum safe sample temperatures as a tule.
+    pub fn get_safe_sample_temperatures(&self) -> (Temperature, Temperature) {
+        (
+            self.safety_warnings.min_safe_sample_temperature,
+            self.safety_warnings.max_safe_sample_temperature,
+        )
     }
 
     /// Get a clone of the Omnicontrol configuration.
@@ -400,12 +405,14 @@ pub struct SafeRangeLimits {
 /// in the system when they are under or overstepped.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SafetyWarnings {
+    pub min_safe_sample_temperature: Temperature,
     pub max_safe_sample_temperature: Temperature,
 }
 
 impl Default for SafetyWarnings {
     fn default() -> Self {
         Self {
+            min_safe_sample_temperature: Temperature::from_kelvin(110.),
             max_safe_sample_temperature: Temperature::from_kelvin(130.),
         }
     }

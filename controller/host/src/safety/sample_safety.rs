@@ -23,34 +23,24 @@ use crate::{
     status::InstrumentStatus,
 };
 
-/// Take a reference to an instrument status and checks if the samples are safe.
-///
-/// This is the cooling sample workflow. It makes sure that in the current instrument status, the
-/// following conditions are okay:
-/// - Waterflow is still okay (indicator that the cryocooler is good).
-/// - The ion pump is still on.
-/// - The pump stand is still on.
-///
-/// If any of these conditions are not met, the buzzer is activated and the and an error dialog is
-/// raised. This error dialog should describe the problem and, when confirmed, pause the buzzer and
-/// safety check for some time for the user to fix the issue.
-pub fn sample_safety(inst_stat: &InstrumentStatus, max_safe_sample_temp: &Temperature) {
+// Take a reference to an instrument status and checks if the samples are safe.
+//
+// This is the cooling sample workflow. It makes sure that in the current instrument status, the
+// following conditions are okay:
+// - Waterflow is still okay (indicator that the cryocooler is good).
+// - The ion pump is still on.
+// - The pump stand is still on.
+//
+// If any of these conditions are not met, the buzzer is activated and the and an error dialog is
+// raised. This error dialog should describe the problem and, when confirmed, pause the buzzer and
+// safety check for some time for the user to fix the issue.
+pub fn sample_safety(inst_stat: &InstrumentStatus, safe_temps: (&Temperature, &Temperature)) {
     // skip any safety check if the cryocooler is off or the alarm is muted.
     if inst_stat.is_cryo_cooler_off() || IS_ALARM_MUTED.load(Ordering::Relaxed) {
         return;
     }
 
-    let wf = inst_stat.is_water_flow_ok();
-    let ip = inst_stat.is_ion_pump_on();
-    let ps = inst_stat.is_pumpstand_on();
-    let sample_temp_curr = inst_stat.get_sample_temperature();
-    let sample_temp_chk = sample_temp_curr < *max_safe_sample_temp;
-
-    if wf && ip && ps && sample_temp_chk {
-        return;
-    }
-
-    if let Err(err_msg) = check_sample_safe(inst_stat, max_safe_sample_temp) {
+    if let Err(err_msg) = check_sample_safe(inst_stat, safe_temps) {
         buzzer().turn_on();
 
         // If UI is not yet set, the alarm will trigger again the next time around.
@@ -67,18 +57,25 @@ pub fn sample_safety(inst_stat: &InstrumentStatus, max_safe_sample_temp: &Temper
 
 /// Routine to check if the sample is actually safe.
 ///
+/// Arguments:
+/// - `inst_stat`: Ref to instrument status.
+/// - `safe_temps`: Tuple of refs to minimum and maximum safe temperature.
+///
 /// Returns:
 /// - Ok(()) if the sample is safe.
 /// - Err() describing the problem (user displayable) if the sample is not safe.
 pub fn check_sample_safe(
     inst_stat: &InstrumentStatus,
-    max_safe_sample_temp: &Temperature,
+    safe_temps: (&Temperature, &Temperature),
 ) -> Result<(), String> {
+    let (min_safe_temp, max_safe_temp) = safe_temps;
+
     let wf = inst_stat.is_water_flow_ok();
     let ip = inst_stat.is_ion_pump_on();
     let ps = inst_stat.is_pumpstand_on();
     let sample_temp_curr = inst_stat.get_sample_temperature();
-    let sample_temp_chk = sample_temp_curr < *max_safe_sample_temp;
+    let sample_temp_chk =
+        (*min_safe_temp <= sample_temp_curr) && (sample_temp_curr <= *max_safe_temp);
 
     if wf && ip && ps && sample_temp_chk {
         return Ok(());
@@ -99,9 +96,10 @@ pub fn check_sample_safe(
     }
     if !sample_temp_chk {
         err_msg.push_str(&format!(
-            "- Sample temperature {:.1} K is above or equal to max allowed temperature {:.1} K.",
+            "- Sample temperature {:.1} K is not between safe range between {:.1} K and {:.1} K.",
             sample_temp_curr.as_kelvin(),
-            max_safe_sample_temp.as_kelvin()
+            min_safe_temp.as_kelvin(),
+            max_safe_temp.as_kelvin(),
         ));
     }
     Err(err_msg)

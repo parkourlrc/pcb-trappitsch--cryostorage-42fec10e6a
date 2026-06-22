@@ -170,10 +170,10 @@ pub async fn instruments_task(mut rx_instr: mpsc::Receiver<InstrumentCommands>) 
     } // drop lock
 
     // Get the max safe sample temperature from the program configuration (only needed once).
-    let max_safe_sample_temperature = prg_conf
+    let (min_safe_sample_temp, max_safe_sample_temp) = prg_conf
         .lock()
         .expect("ProgramConfig lock poisoned")
-        .get_max_safe_sample_temperature();
+        .get_safe_sample_temperatures();
 
     // set later to a reasonable value
     let mut polling_interval = Duration::from_millis(1);
@@ -263,7 +263,7 @@ pub async fn instruments_task(mut rx_instr: mpsc::Receiver<InstrumentCommands>) 
                 let smpls_empty = prg_conf.lock().expect("ProgramConfig lock poisoned").is_samples_empty();
                 if !smpls_empty {
                     let is = inst_status.lock().expect("InstrumentStatus lock poisoned");
-                    sample_safety(&is, &max_safe_sample_temperature);
+                    sample_safety(&is, (&min_safe_sample_temp, &max_safe_sample_temp));
                 }
 
                 // after init, set polling interval to normal value
