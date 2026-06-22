@@ -425,6 +425,8 @@ pub struct SampleTransferAuthorization {
     pub timer: Duration,
     __doc_pressure_max: String,
     pub pressure_max: Pressure,
+    __doc_cnt_pressure_readings: String,
+    pub cnt_pressure_readings: u8,
 }
 
 impl Default for SampleTransferAuthorization {
@@ -438,6 +440,10 @@ impl Default for SampleTransferAuthorization {
                 "Transfer system pressure must be below this limit to open transfer valve.",
             ),
             pressure_max: Pressure::from_millibars(0.00001),
+            __doc_cnt_pressure_readings: String::from(
+                "Number of pressure readings (1 per second) that need to be below limit in a row to continue sample transfer.",
+            ),
+            cnt_pressure_readings: 30,
         }
     }
 }

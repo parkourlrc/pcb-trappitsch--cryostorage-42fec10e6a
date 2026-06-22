@@ -1,6 +1,9 @@
 //! Module for the sample transfer workflow.
 
-use std::sync::Arc;
+use std::sync::{
+    Arc,
+    atomic::{AtomicU8, Ordering},
+};
 
 use icd::{ValveState, VctHandshake};
 
@@ -9,8 +12,10 @@ use crate::{
     get_inst_status_wait,
     prg_config::Authorizations,
     status::PressureReading,
-    workflows::progress_windows::WorkflowProgress,
+    workflows::{MSG_FILL_N2, progress_windows::WorkflowProgress},
 };
+
+static PREAD_COUNTER: AtomicU8 = AtomicU8::new(0);
 
 /// Run the sample transfer workflow.
 ///
@@ -38,14 +43,29 @@ pub async fn sample_transfer_workflow(auths: &Authorizations) {
         return;
     }
 
+    // Display fill N2 message.
+    let _ = wp.notify(MSG_FILL_N2, true).await;
+
     // Set VCT ready to attach status.
     send_cntrl_cmd(ControllerCommands::VctHandshake(VctHandshake::Ready)).await;
 
+    // Close the pump valve.
+    send_cntrl_cmd(ControllerCommands::PumpValve(ValveState::Closed)).await;
+    send_cntrl_cmd(ControllerCommands::TransferValve(ValveState::Closed)).await;
+
     // Ask user to connect VCT and hit attach.
-    if wp.notify("Connect the VCT and click the \"Attach\" button on the VCT controller. When done, hit next.", false).await.is_err() {
+    if wp
+        .notify(
+            "Connect the VCT and click the \"Attach\" button on the VCT controller. Then hit next.",
+            false,
+        )
+        .await
+        .is_err()
+    {
         // Set VCT not ready to attach status.
         send_cntrl_cmd(ControllerCommands::VctHandshake(VctHandshake::NotReady)).await;
-        wp.finalize("Sample transfer cancelled. All is back to normal.", false).await;
+        wp.finalize("Sample transfer cancelled. All is back to normal.", false)
+            .await;
         return;
     }
 
@@ -55,14 +75,30 @@ pub async fn sample_transfer_workflow(auths: &Authorizations) {
         If you press cancel, the transfer valve will not open and you will have to manually unset the \"VCT ready\" status.",
         auths.sample_transfer.pressure_max.as_millibars()
     );
+
+    PREAD_COUNTER.store(0, Ordering::Relaxed);
+
     let check = {
         let inst_status = Arc::clone(&inst_status);
         let p_max = auths.sample_transfer.pressure_max;
+        let cnt_pressure_readings = auths.sample_transfer.cnt_pressure_readings;
         move || -> bool {
             let guard = inst_status.lock().expect("InstrumentStatus lock poisoned");
             let is_attached = guard.is_vct_gate_open();
             if let (_p_ch, PressureReading::Value(p_tr)) = guard.get_pressures() {
-                (p_tr < p_max) && is_attached
+                // Counter here is ~seconds, it's an empirical value. Might need tuning.
+                if (p_tr < p_max)
+                    && is_attached
+                    && PREAD_COUNTER.load(Ordering::Relaxed) >= cnt_pressure_readings
+                {
+                    true
+                } else if (p_tr < p_max) && is_attached {
+                    let _cnt = PREAD_COUNTER.fetch_add(1, Ordering::Relaxed);
+                    false
+                } else {
+                    PREAD_COUNTER.store(0, Ordering::Relaxed);
+                    false
+                }
             } else {
                 false
             }
@@ -72,12 +108,34 @@ pub async fn sample_transfer_workflow(auths: &Authorizations) {
     wp.show_vacuum_plot(true);
     if wp.check_for(dur, &msg, check).await.is_err() {
         wp.show_vacuum_plot(false);
+        wp.finalize(
+            "Failed to attach and pump the VCT. Detach the shuttle before clicking Done.",
+            true,
+        )
+        .await;
         send_cntrl_cmd(ControllerCommands::VctHandshake(VctHandshake::NotReady)).await;
-        wp.finalize("Failed to attach and pump the VCT.", true)
-            .await;
         return;
     }
     wp.show_vacuum_plot(false);
+
+    if wp
+        .notify(
+            "Click next when you are ready to open the transfer valve \
+                and the VCT has opened both valves.\n \
+                If you click cancel, the sample transfer is aborted.",
+            false,
+        )
+        .await
+        .is_err()
+    {
+        wp.finalize(
+            "Sample transfer cancelled. Please detach the shuttle before clicking Done.",
+            false,
+        )
+        .await;
+        send_cntrl_cmd(ControllerCommands::VctHandshake(VctHandshake::NotReady)).await;
+        return;
+    }
 
     // Open the transfer valve.
     send_cntrl_cmd(ControllerCommands::TransferValve(ValveState::Open)).await;
@@ -99,7 +157,8 @@ pub async fn sample_transfer_workflow(auths: &Authorizations) {
 
     if wp.check_for_infinite_time(msg, check).await.is_err() {
         wp.finalize(
-            "Could not detach the VCT from the cryostorage chamber. The transfer valve stays open.",
+            "Could not detach the VCT from the cryostorage chamber. The transfer valve stays open. \
+               Clicking Done will disable readyness to attach/detach the shuttle.",
             true,
         )
         .await;

@@ -158,7 +158,7 @@ async fn main(spawner: Spawner) {
     );
     let vct = Vct::new(
         Output::new(p.PIN_17, Level::Low), // Init NotReady
-        Input::new(p.PIN_14, Pull::None),
+        Input::new(p.PIN_13, Pull::None),
         Input::new(p.PIN_16, Pull::None),
     );
 

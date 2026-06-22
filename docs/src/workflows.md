@@ -314,7 +314,7 @@ In the "vent" workflow, this message has already been given before.
 
 The following workflow shows how a sample is transferred.
 This workflow is fairly permissive,
-such that even if the cryo cooler has failed,
+such that even if the cryocooler has failed,
 a user can get there sample out and keep it save.
 The user is thus responsible to ensure
 that the cooler is on and that the temperature of the sample holder
@@ -325,6 +325,12 @@ and represents a maximum limit.
 If the pressure is not good within these 10 minutes,
 there might be a leak or something similar.
 
+> [!NOTE]
+> To ensure that the pressure is below the defined limit,
+> we read it (default) 30 times in a row,
+> which takes roughly 30 seconds.
+> This value is configurable in the config file.
+
 The detach check contains no timeout.
 We will wait until the VCT is detached
 and then close the transfer valve.
@@ -334,7 +340,9 @@ prevents the transfer valve from closing before the VCT valves are closed.
 ```mermaid
   flowchart TD
     PR[Transfer sample] --> RDY
-    RDY[/Set "VCT ready" status/] --> NAtt
+    RDY[/Set "VCT ready" status/] --> N2Not
+    N2Not@{ shape: paper-tape, label: "Fill N<sub>2</sub> balloon."} -->|Next| ClPump
+    ClPump[/Close pump valve/] --> NAtt
     NAtt@{ shape: paper-tape, label: "Notify user to dock VCT and click attach button."} -->|Cancel| NRDY
     NRDY[/Unset "VCT ready" status/] --> Err
     NAtt -->|Next| CHKOP[\"Check for 10min
@@ -342,7 +350,9 @@ prevents the transfer valve from closing before the VCT valves are closed.
               AND 
               p<sub>tr</sub> < 1e-5mbar"/]
     CHKOP -->|Timeout| NRDY
-    CHKOP -->|True| OpTrV
+    CHKOP -->|True| NotifyOpTr
+    NotifyOpTr@{ shape: paper-tape, label: "System ready. Click next to open transfer valve."} -->|Cancel| NRDY
+    NotifyOpTr -->|Next| OpTrV
     OpTrV[/Open transfer valve/] --> WaitForDet
     WaitForDet[/Wait for detach: no time limit; instruct user to transfer sample, retract arm, click detach.\] -->|Cancel| NRDY
     WaitForDet --> |True| NRDYF
