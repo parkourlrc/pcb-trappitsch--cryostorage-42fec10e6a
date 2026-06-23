@@ -27,7 +27,7 @@ use crate::{
     plots::{pressure_plot_task, temperature_plot_task},
     prg_config::PrgConfig,
     status::InstrumentStatus,
-    workflows::{WORKFLOW_COMMAND_SENDER, workflow_task},
+    workflows::{PROGRESS_WINDOW, WORKFLOW_COMMAND_SENDER, workflow_task},
 };
 
 pub static CONFIG_FOLDER: OnceCell<PathBuf> = OnceCell::const_new(); // config files, logs
@@ -66,6 +66,9 @@ async fn main() {
     log::LOG_SENDER.set(tx_log).expect("Uninitialized");
 
     let log_handler_listen = tokio::spawn(log::log_handler_task(log_handler));
+
+    // Initialize PROGRESS_WINDOW
+    PROGRESS_WINDOW.set(Mutex::new(None)).ok();
 
     // Pressure plotting task
     let (tx_p_plot, rx_p_plot) = mpsc::channel(32);

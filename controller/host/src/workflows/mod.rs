@@ -46,6 +46,8 @@ mod timer;
 mod valves;
 mod vent_chamber;
 
+pub use progress_windows::PROGRESS_WINDOW;
+
 /// Some static strings to use for consistent messaging.
 static MSG_FILL_N2: &str = "Ensure that there is nitrogen in the balloon and press next.";
 

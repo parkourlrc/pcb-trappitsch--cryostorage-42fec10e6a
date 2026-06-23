@@ -15,6 +15,7 @@ use crate::{
         Measurements, PLOT_STYLE, PlotSizePx, PressureDataPoint, TIME_INTERVAL_CLEANUP,
         TIME_RANGE_TO_KEEP,
     },
+    workflows::PROGRESS_WINDOW,
 };
 
 pub enum PressurePlotCommands {
@@ -121,11 +122,22 @@ impl PressurePlot {
         drop(chart);
         drop(root);
 
-        ui.upgrade_in_event_loop(move |ui| {
-            let img = slint::Image::from_rgb8(pixel_buffer);
-            ui.global::<Logic>().set_vacuum_plot(img);
-        })
-        .expect("UI still exists");
+        if let Some(cell) = PROGRESS_WINDOW.get()
+            && let Some(pw_weak) = cell.lock().unwrap().clone()
+        {
+            pw_weak
+                .upgrade_in_event_loop(move |pw| {
+                    let img = slint::Image::from_rgb8(pixel_buffer);
+                    pw.global::<Logic>().set_vacuum_plot(img.clone());
+                })
+                .expect("ProgressWindow exists");
+        } else {
+            ui.upgrade_in_event_loop(move |ui| {
+                let img = slint::Image::from_rgb8(pixel_buffer);
+                ui.global::<Logic>().set_vacuum_plot(img);
+            })
+            .expect("UI still exists");
+        }
 
         Ok(())
     }

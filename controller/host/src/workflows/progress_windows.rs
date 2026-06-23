@@ -5,7 +5,7 @@ use std::time::Duration;
 use anyhow::{Result, anyhow, bail};
 use slint::{ComponentHandle, Weak};
 use tokio::{
-    sync::{mpsc, oneshot},
+    sync::{OnceCell, mpsc, oneshot},
     time::sleep,
 };
 
@@ -24,6 +24,9 @@ pub enum WorkflowProgressAction {
     /// Ok button was pressed.
     Ok,
 }
+
+pub static PROGRESS_WINDOW: OnceCell<std::sync::Mutex<Option<slint::Weak<ProgressWindow>>>> =
+    OnceCell::const_new();
 
 /// A structure that holds the buttons state.
 ///
@@ -98,6 +101,11 @@ impl WorkflowProgress {
         })
         .expect("UI must be alive.");
         let pw = rxos.await.expect("UI thread must be still alive");
+
+        // load the progress window into the OnceCell
+        if let Some(cell) = PROGRESS_WINDOW.get() {
+            *cell.lock().unwrap() = Some(pw.clone());
+        }
 
         Self { pw, rx }
     }
@@ -210,6 +218,10 @@ impl WorkflowProgress {
 
     /// Close the progress window.
     pub fn close(&mut self) {
+        if let Some(cell) = PROGRESS_WINDOW.get() {
+            *cell.lock().unwrap() = None;
+        }
+
         self.pw
             .upgrade_in_event_loop(move |pw| {
                 pw.hide().expect("PrgWin UI must be alive.");
