@@ -43,7 +43,6 @@ pub async fn pfeiffer_hicube_task(rx_hicube: mpsc::Receiver<HiCubeCommands>) {
 
     let inst_status = get_inst_status_wait().await;
 
-    // FIXME: Make sure this timeout is long enough with the actual instrument!
     let hicube_inst =
         match HiCubeClient::try_new_and_connect(&conf.tcp_ip_adapter.get_address(), TCP_IP_TIMEOUT)
             .await

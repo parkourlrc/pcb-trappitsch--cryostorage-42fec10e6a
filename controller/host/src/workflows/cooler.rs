@@ -2,7 +2,7 @@
 
 use std::sync::{Arc, Mutex};
 
-use anyhow::{Result, anyhow, bail};
+use anyhow::{Result, bail};
 
 use sunpower_cryotelgt::CoolerState;
 
