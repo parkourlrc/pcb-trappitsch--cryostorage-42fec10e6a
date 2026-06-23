@@ -180,13 +180,14 @@ i.e., it will close the vent valve.
 
 ### Pump cryostorage chamber
 
-The variables that can be adjusted in this workflow are two durations.
+The variables that can be adjusted in this workflow are three durations.
 
 - Maximum time allowed for primary pump to pump the chamber
   down to <10<sup>-5</sup>mbar.
 - Duration to wait before the ion pump is turned on.
   If this waiting time is canceled by the user, the workflow will finish
   but not turn on the ion pump.
+- Duration to wait after ion pump turns on to close pump valve.
 
 Again, as for the venting workflow, the pressure limits
 to determine if we have pump valve opening authorization
@@ -207,10 +208,14 @@ are the same as the ones for valve authorization.
         Condition: p<sub>ch</sub> < 1e-5mbar"/]
     PCHK -->|Timeout| StPP[/Stop primary pump/] --> Err
     PCHK -->|True| IPTIM
+    IPTIM --> |Cancel| Err
     IPTIM[/Wait 2h\] --> IP
+    IP[/Start Ion Pump/] -->
+    ValveTim --> |Cancel| Err
+    ValveTim[/Wait 1min\] --> Valve
 
     subgraph Level3 [Final]
-      IP[/Start Ion Pump/]
+      Valve[/Close pump valve/]
       Err[/Abort/]
     end
 

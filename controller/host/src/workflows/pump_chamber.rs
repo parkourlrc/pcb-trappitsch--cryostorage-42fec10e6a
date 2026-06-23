@@ -1,13 +1,19 @@
 //! Workflow for pumping the chamber.
 
+use agilent_4uhv::HvState;
 use anyhow::anyhow;
 use icd::ValveState;
 
 use std::sync::Arc;
 
 use crate::{
+    controller::send_cntrl_cmd,
     get_inst_status_wait,
-    instruments::hi_cube::{HiCubeCommands, send_hicube_cmd_w_err},
+    instruments::{
+        InstrumentCommands,
+        hi_cube::{HiCubeCommands, send_hicube_cmd_w_err},
+        send_instr_cmd_w_err,
+    },
     prg_config::Authorizations,
     status::{PressureReading, PumpState},
     workflows::{
@@ -143,9 +149,39 @@ pub async fn pump_chamber_workflow(auths: &Authorizations) {
             true,
         )
         .await;
-    } else {
-        wp.finalize("Pumping the chamber successfully completed.", false)
-            .await;
+        return;
     }
+
+    // Turn on the ion pump
+    if send_instr_cmd_w_err(InstrumentCommands::IonPumpState(HvState::On))
+        .await
+        .is_err()
+    {
+        let msg = "Could not turn ion pump.";
+        wp.finalize(msg, true).await;
+        return;
+    };
+
+    // Wait for one minute to close valve.
+    let dur = auths.pump_chamber.timer_pump_valve_close;
+    let msg = "Waiting until the timer expires to close the pump valve. \
+            If you press cancel before, the pump valve will stay open.";
+    if wp.wait_for(dur, msg).await.is_err() {
+        wp.finalize(
+            "Waiting for pump valve to close was cancelled. The pump valve stays open.",
+            true,
+        )
+        .await;
+        return;
+    }
+
+    // Close pump valve.
+    send_cntrl_cmd(crate::controller::ControllerCommands::PumpValve(
+        ValveState::Closed,
+    ))
+    .await;
+
+    wp.finalize("Pumping the chamber successfully completed.", false)
+        .await;
     wp.show_vacuum_plot(false);
 }

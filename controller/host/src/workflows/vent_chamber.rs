@@ -36,61 +36,6 @@ use crate::{
 /// - `auths`: Authorizations.
 /// - `ui`: A weak handle to the main user interface.
 pub async fn vent_chamber_workflow(auths: &Authorizations) {
-    // THE DEMO
-    // let desc =
-    //     "Vent the chamber and transfer system. This process takes between 25 and 45 minutes.";
-    // let mut wp = WorkflowProgress::new("Venting the chamber", desc, ui.clone()).await;
-    //
-    // if wp.notify("This is a notification.").await.is_err() {
-    //     wp.finalize("Screw you", false).await;
-    //     return;
-    // };
-    //
-    // // show the vacuum plot till the timer expires or the user presses cancel.
-    // wp.show_vacuum_plot(true);
-    // let _ = wp
-    //     .wait_for(
-    //         Duration::from_secs(13),
-    //         "Here's the vacuum plot for the duration of the timer or till you hit cancel.",
-    //     )
-    //     .await;
-    // wp.show_vacuum_plot(false);
-    //
-    // // start a timer of 10 seconds.
-    // if wp
-    //     .wait_for(
-    //         Duration::from_secs(10),
-    //         "Please be a nice person and wait for the timer to finish.",
-    //     )
-    //     .await
-    //     .is_ok()
-    // {
-    //     wp.finalize("Good boy, have a cookie", false).await;
-    //     return;
-    // };
-    //
-    // // somebody pressed cancel, let's give them a really long timer that expires after 5 sec with a
-    // // message.
-    // let check = {
-    //     let now = std::time::Instant::now();
-    //     move || std::time::Instant::now() - now > Duration::from_secs(5)
-    // };
-    //
-    // if wp
-    //     .check_for(
-    //         Duration::from_hours(200),
-    //         "Bad boy, no chocolate for you!",
-    //         check,
-    //     )
-    //     .await
-    //     .is_ok()
-    // {
-    //     wp.finalize("Haha, got you. Next time be better", false)
-    //         .await;
-    // } else {
-    //     wp.finalize("WTF, again?????", true).await;
-    // };
-    // END DEMO
     let inst_status = get_inst_status_wait().await;
 
     let desc =

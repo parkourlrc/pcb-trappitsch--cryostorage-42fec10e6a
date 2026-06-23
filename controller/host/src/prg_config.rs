@@ -361,6 +361,8 @@ pub struct PumpChamberAuthorization {
     pub pressure_limit_primary_pump: Pressure,
     __doc_timer_ion_pump: String,
     pub timer_ion_pump: Duration,
+    __doc_timer_close_pump_valve: String,
+    pub timer_pump_valve_close: Duration,
 }
 
 impl Default for PumpChamberAuthorization {
@@ -378,6 +380,10 @@ impl Default for PumpChamberAuthorization {
                 "Duration to wait after primary pump limit is reached before starting ion pump.",
             ),
             timer_ion_pump: Duration::from_hours(2),
+            __doc_timer_close_pump_valve: String::from(
+                "Duration to wait after ion pump turns on and before pump valve closes.",
+            ),
+            timer_pump_valve_close: Duration::from_mins(1),
         }
     }
 }
