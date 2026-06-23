@@ -14,6 +14,8 @@ import {
     InfoAreaSmall,
     MyVerticalLayout,
     MyHorizontalLayout,
+    H2Text,
+    H3Text,
 } from "elements.slint";
 import { Palette } from "palette.slint";
 import { Samples } from "samples.slint";
@@ -26,7 +28,7 @@ export component HomeScreen inherits MyWindow {
 
         MyHorizontalLayout {
 
-            InfoArea{
+            InfoArea {
                 title: "Sample temperature";
                 title_color: Palette.rosewater;
                 text_color: (Logic.sample_temp > 0 && Logic.sample_temp < 120) ? Palette.blue : Palette.red;
@@ -53,7 +55,7 @@ export component HomeScreen inherits MyWindow {
                 padding-left: 0px;
                 padding-right: 0px;
 
-                BigButton{
+                BigButton {
                     enabled: true;  // no need for admin mode
                     text: "Start Sample Transfer";
                     clicked() => {
@@ -61,16 +63,79 @@ export component HomeScreen inherits MyWindow {
                     }
                 }
 
-                BigSwitch {
-                    enabled: true;  // no need for admin mode
-                    title: "Vacuum Chamber";
-                    right_side: Logic.chamber_is_pumped;
-                    left_text: "Vent";
-                    right_text: "Pump";
-                    switched(set_pumped) => {
-                        Logic.set_chamber_is_pumped(set_pumped);  // bool
+                Rectangle {
+                    width: Const.element_width_wide;
+                    height: Const.big_switch_height;
+
+                    background: Palette.bg_area;
+                    border_radius: Const.border_radius_large;
+
+                    VerticalLayout {
+                        padding: Const.padding_large;
+                        H2Text {
+                            text: "Vacuum Chamber";
+                            horizontal-alignment: center;
+                        }
+
+                        HorizontalLayout {
+                            alignment: space-between;
+
+                            Rectangle {
+                                width: 47%;
+                                height: 35%;
+
+                                border-radius: Const.border_radius_small;
+
+                                ta_vent := TouchArea {
+                                    clicked => {
+                                        Logic.vent_chamber()
+                                    }
+                                }
+
+                                background: ta_vent.pressed ? Palette.button_on : Palette.button_off;
+
+                                H3Text {
+                                    text: "Vent";
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                    color: Palette.text;
+                                }
+                            }
+
+                            Rectangle {
+                                width: 47%;
+                                height: 35%;
+
+                                border-radius: Const.border_radius_small;
+
+                                ta_pump := TouchArea {
+                                    clicked => {
+                                        Logic.pump_chamber()
+                                    }
+                                }
+
+                                background: ta_pump.pressed ? Palette.button_on : Palette.button_off;
+
+                                H3Text {
+                                    text: "Pump";
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                    color: Palette.text;
+                                }
+                            }
+                        }
                     }
                 }
+                // BigSwitch {
+                //     enabled: true;  // no need for admin mode
+                //     title: "Vacuum Chamber";
+                //     right_side: Logic.chamber_is_pumped;
+                //     left_text: "Vent";
+                //     right_text: "Pump";
+                //     switched(set_pumped) => {
+                //         Logic.set_chamber_is_pumped(set_pumped);  // bool
+                //     }
+                // }
             }
 
             LightSwitch {

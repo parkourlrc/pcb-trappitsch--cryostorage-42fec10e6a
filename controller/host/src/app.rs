@@ -322,14 +322,15 @@ impl InstrumentCommandHandler {
 
     /// Change the chamber vacuum state upon request
     fn chamber_vacuum(&self) {
-        self.ui.global::<Logic>().on_set_chamber_is_pumped({
-            move |val| {
-                let cmd = if val {
-                    WorkflowCommands::ChamberPump
-                } else {
-                    WorkflowCommands::ChamberVent
-                };
-                send_workflow_command_now(cmd);
+        self.ui.global::<Logic>().on_vent_chamber({
+            move || {
+                send_workflow_command_now(WorkflowCommands::ChamberVent);
+            }
+        });
+
+        self.ui.global::<Logic>().on_pump_chamber({
+            move || {
+                send_workflow_command_now(WorkflowCommands::ChamberPump);
             }
         });
     }

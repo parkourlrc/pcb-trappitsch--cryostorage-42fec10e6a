@@ -28,8 +28,8 @@ export enum PumpStandStateGUI {
 // Logic
 export global Logic {
     // Overall workflows
-    pure callback set_chamber_is_pumped(bool);
-    in-out property <bool> chamber_is_pumped;
+    pure callback pump_chamber();
+    pure callback vent_chamber();
     pure callback initiate_sample_transfer();
 
     // Baking
