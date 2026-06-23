@@ -6,6 +6,7 @@ use slint::ComponentHandle;
 
 use crate::{
     app::{BakingTime, Logic, UI, ValveOrPumpState},
+    log,
     status::InstrumentStatus,
 };
 
@@ -57,13 +58,37 @@ impl InstrumentStatus {
     }
 
     /// Set valve pump called state.
-    pub fn set_valve_pump_call(&mut self, state: ValveState) {
+    pub fn set_valve_pump_call_and_ui(&mut self, state: ValveState) {
         self.valve_pump_call = state;
+        let ui = match UI.get() {
+            Some(i) => i,
+            None => {
+                log::err_now!("Could not get UI to set pump valve call to it.");
+                return;
+            }
+        };
+        ui.upgrade_in_event_loop(move |ui| {
+            ui.global::<Logic>()
+                .set_pump_valve_is_open(state == ValveState::Open);
+        })
+        .expect("UI must be running");
     }
 
     /// Set valve transfer called state.
-    pub fn set_valve_transfer_call(&mut self, state: ValveState) {
+    pub fn set_valve_transfer_call_and_ui(&mut self, state: ValveState) {
         self.valve_transfer_call = state;
+        let ui = match UI.get() {
+            Some(i) => i,
+            None => {
+                log::err_now!("Could not get UI to set transfer valve call to it.");
+                return;
+            }
+        };
+        ui.upgrade_in_event_loop(move |ui| {
+            ui.global::<Logic>()
+                .set_transfer_valve_is_open(state == ValveState::Open);
+        })
+        .expect("UI must be running");
     }
 
     /// Update status from a broadcast message. Then update UI.
@@ -95,7 +120,7 @@ impl InstrumentStatus {
             // Water flow
             let water_flow_ok = matches!(self.flow_meter_curr, FlowMeterState::Ok);
 
-            // Pump valve status
+            // Check if call state is equal to current state
             let valve_pump_state = if self.valve_pump_call == self.valve_pump_curr {
                 self.valve_pump_curr.into()
             } else {

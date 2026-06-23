@@ -88,6 +88,15 @@ pub async fn pump_chamber_workflow(auths: &Authorizations) {
         }
     }
 
+    // close the vent valve
+    if send_hicube_cmd_w_err(HiCubeCommands::SetVentingValveState(ValveState::Closed))
+        .await
+        .is_err()
+    {
+        wp.finalize("Could close the venting valve.", true).await;
+        return;
+    };
+
     // start primary pump.
     if send_hicube_cmd_w_err(HiCubeCommands::SetPumpStandState(PumpState::On))
         .await

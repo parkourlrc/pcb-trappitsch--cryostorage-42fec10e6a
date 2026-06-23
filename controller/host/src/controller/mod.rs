@@ -134,11 +134,11 @@ pub async fn controller_task(cntrl: ControllerClient, mut rx: mpsc::Receiver<Con
                         cntrl.baking(state).await;
                     }
                     ControllerCommands::PumpValve(state) => {
-                        inst_status.lock().expect("Poisoned").set_valve_pump_call(state);
+                        inst_status.lock().expect("Poisoned").set_valve_pump_call_and_ui(state);
                         cntrl.pump_valve(state).await;
                     }
                     ControllerCommands::TransferValve(state) => {
-                        inst_status.lock().expect("Poisoned").set_valve_transfer_call(state);
+                        inst_status.lock().expect("Poisoned").set_valve_transfer_call_and_ui(state);
                         cntrl.transfer_valve(state).await;
                     }
                     ControllerCommands::VctHandshake(handshake) => {

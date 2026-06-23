@@ -209,7 +209,8 @@ are the same as the ones for valve authorization.
     OP[/Open pump valve/]
     OP --> PP
     IsOP -->|Yes| PP
-    PP[/Start primary pump/] --> PCHK
+    PP[/"Close vent valve and
+         start primary pump"/] --> PCHK
     PCHK[\"Check for 40min 
         Condition: p<sub>ch</sub> < 1e-5mbar"/]
     PCHK -->|Timeout| StPP[/Stop primary pump/] --> Err
