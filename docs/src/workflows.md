@@ -65,12 +65,18 @@ this workflow as well.
 ```mermaid
   flowchart TD
     T[Start cryocooler] --> WS{{Water safety okay}}
-    WS -->|No| Err[/Abort/]
+    WS -->|No| Err
     WS -->|Yes| BS{{Baking deactivated}}
     BS -->|No| Err
     BS -->|Yes| PCH{{p<sub>ch</sub> < 1e-5mbar?}}
     PCH -->|No| Err
-    PCH -->|Yes| Ok[/Start cryocooler/]
+    PCH -->|Yes| IonPump
+    IonPump{{Is ion pump on?}} -->|No| Err
+    IonPump -->|Yes| PumpValve
+    PumpValve{{Is pump valve closed?}} -->|No| Err 
+    PumpValve -->|Yes| Ok
+    Err[/Abort/]
+    Ok[/Start cryocooler/]
 ```
 
 ## Stop cryocooler

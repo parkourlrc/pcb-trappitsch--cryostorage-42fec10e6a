@@ -36,13 +36,19 @@ fn get_start_cooler_permission(
     //     bail!("Water flow error: cannot start cooler.")
     // };
 
-    if p_chamber_mbar < auths.cryo_cooler.max_pressure_on_mbar {
-        Ok(())
-    } else {
-        Err(anyhow!(
-            "Chamber pressure is too high: cannot start cooler."
-        ))
+    if p_chamber_mbar >= auths.cryo_cooler.max_pressure_on_mbar {
+        bail!("Chamber pressure is too high: cannot start cooler.")
     }
+
+    if !inst_status.lock().expect("Poisoned").is_ion_pump_on() {
+        bail!("Ion pump must be on to start the cryocooler.")
+    }
+
+    if inst_status.lock().expect("Poisoned").is_pump_valve_open() {
+        bail!("Pump valve must be closed to start the cryocooler.")
+    }
+
+    Ok(())
 }
 
 /// Get permission to stop the cryocooler.
