@@ -114,9 +114,7 @@ pub async fn instruments_task(mut rx_instr: mpsc::Receiver<InstrumentCommands>) 
     // Wait for the UI to be globally available.
     let _ = get_ui_wait().await;
 
-    // Set the instrument initial states
-    // cryocooler
-    // FIXME: This reads the last wanted setpoint temperature from the config file.
+    // Set the instrument initial states cryocooler
     let sample_setpoint_temperature = inst_status
         .lock()
         .expect("InstStatus mutex poisoned")
