@@ -9,10 +9,10 @@ import { SettingsScreen } from "screen_settings.slint";
 import { Keyboard, KeyboardLogic } from "keyboard.slint";
 import { Keypad, KeypadLogic } from "keypad.slint";
 import { ProgressWindow, ProgressWindowLogic } from "workflow_progress.slint";
-import { ErrorDialog } from "dialog.slint";
+import { ConfirmDialog, ErrorDialog } from "dialog.slint";
 import { Logic } from "logic.slint";
 
-export { Logic, Keyboard, KeyboardLogic, Keypad, KeypadLogic, ErrorDialog, ProgressWindow, ProgressWindowLogic }
+export { Logic, Keyboard, KeyboardLogic, Keypad, KeypadLogic, ConfirmDialog, ErrorDialog, ProgressWindow, ProgressWindowLogic }
 
 export component AppWindow inherits Window {
     no-frame: true;

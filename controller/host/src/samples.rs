@@ -2,7 +2,14 @@
 use anyhow::{Result, bail};
 use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
+use slint::{ComponentHandle, Model, SharedString};
 use std::collections::BTreeMap;
+
+use crate::{
+    app::{Logic, get_ui_wait},
+    dialog::confirm_dialog_helper,
+    get_prg_conf_wait,
+};
 
 const SMP_POSITIONS: [&str; 8] = ["A1", "A2", "B1", "B2", "C1", "C2", "D1", "D2"];
 const SMP_BUTTON_WIDTH: f32 = 272.5;
@@ -204,6 +211,51 @@ fn row_col_to_position_name(row: isize, col: isize) -> Result<String> {
 /// Get the index number for a sample position given its name.
 pub fn get_sample_idx(pos: &str) -> Option<usize> {
     SMP_POSITIONS.iter().position(|&p| p == pos)
+}
+
+/// An async routine that can be spawned to change the swiped sample, if it should.
+///
+/// This will allow it to use a confirmation dialog.
+pub async fn swipe_swap_samples(pos: SharedString, dx: f32, dy: f32) {
+    let cfg = get_prg_conf_wait().await;
+    let ui = get_ui_wait().await;
+
+    // get the new position
+    let new_pos = match sample_button_swipe(&pos, dx, dy) {
+        Ok(i) => {
+            if pos == i {
+                return;
+            } else {
+                i
+            }
+        }
+        _ => return,
+    };
+
+    let msg = format!(
+        "Do you want to swap the samples with positions {} and {}?",
+        pos, new_pos
+    );
+
+    if !confirm_dialog_helper(msg).await {
+        return;
+    }
+
+    if let Some(swp) = cfg
+        .lock()
+        .expect("Poisoned")
+        .execute_swipe_action(&pos, dx, dy)
+    {
+        let model = ui.unwrap().global::<Logic>().get_sample_model();
+        for (pos, smp) in swp {
+            if let Some(idx) = get_sample_idx(&pos) {
+                model.set_row_data(
+                    idx,
+                    (smp.get_date().into(), smp.get_name().into(), pos.into()),
+                );
+            };
+        }
+    }
 }
 
 // tests

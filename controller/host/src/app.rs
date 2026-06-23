@@ -24,7 +24,7 @@ use crate::{
     },
     prg_config::PrgConfig,
     safety::test_alarm,
-    samples::get_sample_idx,
+    samples::{get_sample_idx, swipe_swap_samples},
     status::PumpState,
     workflows::{WorkflowCommands, send_workflow_command_now},
 };
@@ -279,36 +279,18 @@ impl GuiCommandHandler {
                 };
 
                 slint::spawn_local(async_compat::Compat::new(fut)).unwrap();
-
-                //         }
-                //     });
             }
         });
     }
 
     fn sample_swiped(&self) {
         self.ui.global::<Logic>().on_sample_swiped({
-            let cfg = Arc::clone(&self.conf);
-            let ui = self.ui.as_weak();
             move |pos, start, end| {
                 let dx = end.x - start.x;
                 let dy = end.y - start.y;
 
-                if let Some(swp) = cfg
-                    .lock()
-                    .expect("Poisoned")
-                    .execute_swipe_action(&pos, dx, dy)
-                {
-                    let model = ui.unwrap().global::<Logic>().get_sample_model();
-                    for (pos, smp) in swp {
-                        if let Some(idx) = get_sample_idx(&pos) {
-                            model.set_row_data(
-                                idx,
-                                (smp.get_date().into(), smp.get_name().into(), pos.into()),
-                            );
-                        };
-                    }
-                }
+                let fut = swipe_swap_samples(pos, dx, dy);
+                slint::spawn_local(async_compat::Compat::new(fut)).unwrap();
             }
         });
     }

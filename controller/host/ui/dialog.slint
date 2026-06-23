@@ -2,6 +2,62 @@ import { Const } from "consts.slint";
 import { Palette } from "palette.slint";
 import { NormalText, RegularButton, H3Text } from "elements.slint";
 
+export component ConfirmDialog inherits Window {
+    in property <string> confirm_header: "Confirm Action:";
+    in property <string> confirm_message: "Please confirm your action";
+    pure callback yes_pressed();
+    pure callback no_pressed();
+
+    full-screen: true;
+    always-on-top: true;
+    no-frame: true;
+
+    background: Palette.bg;
+
+    VerticalLayout {
+        spacing: 20px;
+        padding: 20px;
+        alignment: center;
+
+        H3Text {
+            text: root.confirm_header;
+        }
+
+        NormalText {
+            text: root.confirm_message;
+            wrap: word-wrap;
+        }
+
+        Rectangle {
+            height: 10px;
+        }
+
+        HorizontalLayout {
+            padding: 20px;
+            spacing: 20px;
+            alignment: end;
+
+            RegularButton {
+                enabled: true;
+                text: "No";
+
+                clicked => {
+                    root.no_pressed();
+                }
+            }
+
+            RegularButton {
+                enabled: true;
+                text: "Yes";
+
+                clicked => {
+                    root.yes_pressed();
+                }
+            }
+        }
+    }
+}
+
 export component ErrorDialog inherits Window {
     in property <string> error_header: "Error:";
     in property <string> error_message: "An error has occurred.\n\nYou did something stupid, you moron.";
