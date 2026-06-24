@@ -230,7 +230,7 @@ are the same as the ones for valve authorization.
     IPPcheck -->|Yes| IP
     IP[/Start Ion Pump/] -->
     ValveTim --> |Cancel| Err
-    ValveTim[/Wait 1min\] --> Valve
+    ValveTim[/Wait 5 min\] --> Valve
 
     subgraph Level3 [Final]
       Valve[/Close pump valve/]

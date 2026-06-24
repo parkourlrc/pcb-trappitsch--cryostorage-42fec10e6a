@@ -371,7 +371,7 @@ impl Default for PumpChamberAuthorization {
             __doc_timer_close_pump_valve: String::from(
                 "Duration to wait after ion pump turns on and before pump valve closes.",
             ),
-            timer_pump_valve_close: Duration::from_mins(1),
+            timer_pump_valve_close: Duration::from_mins(5),
         }
     }
 }
