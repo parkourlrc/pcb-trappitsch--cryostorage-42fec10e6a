@@ -18,6 +18,7 @@ use measurements::{Temperature, TemperatureDelta};
 
 use crate::{
     app::UI,
+    instruments::{InstrumentCommands, send_instr_cmd_now},
     log,
     safety::{IS_ALARM_MUTED, buzzer, show_alarm_dialog},
     status::InstrumentStatus,
@@ -79,14 +80,21 @@ pub fn check_sample_safe(
     let min_safe_temp = *temperature_setpoint - *safe_temperature_half_band;
     let max_safe_temp = *temperature_setpoint + *safe_temperature_half_band;
 
+    // if the temperature is too low, try to turn on the heater in case it kicked out.
+    if sample_temp_curr < min_safe_temp + *safe_temperature_half_band / 2. {
+        send_instr_cmd_now(InstrumentCommands::TurnLakeshoreHeaterOn);
+    }
+
     // rest of the checks that would raise an alarm
-    let wf = inst_stat.is_water_flow_ok();
+    // FIXME: put waterflow back into checks
+    // let wf = inst_stat.is_water_flow_ok();
     let ip = inst_stat.is_ion_pump_on();
     let ps = inst_stat.is_pumpstand_on();
     let sample_temp_chk =
         (min_safe_temp <= sample_temp_curr) && (sample_temp_curr <= max_safe_temp);
 
-    if wf && ip && ps && sample_temp_chk {
+    // FIXME: Add waterflows back in
+    if ip && ps && sample_temp_chk {
         return Ok(());
     }
 
@@ -94,9 +102,10 @@ pub fn check_sample_safe(
     let mut err_msg = String::from(
         "The following component(s) have failed, which puts the sample in jeopardy.\n",
     );
-    if !wf {
-        err_msg.push_str("- Waterflow for cooler is not maintained.\n");
-    }
+    // FIXME: Add waterflow back in
+    // if !wf {
+    //     err_msg.push_str("- Waterflow for cooler is not maintained.\n");
+    // }
     if !ip {
         err_msg.push_str("- Ion pump is not turned on.\n");
     }

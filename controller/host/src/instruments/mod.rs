@@ -69,6 +69,8 @@ pub enum InstrumentCommands {
     IonPumpState(HvState),
     /// Set the target temperature of the sample via heating setting of Lakeshore controller.
     SampleTargetTemperature(Temperature),
+    /// Turn the lakeshore336 heater on.
+    TurnLakeshoreHeaterOn,
 }
 
 /// Monitoring task that polls the instruments periodically.
@@ -306,24 +308,35 @@ pub async fn instruments_task(mut rx_instr: mpsc::Receiver<InstrumentCommands>) 
                     InstrumentCommands::CryoCoolerState(state) => {
                         match cryocooler_inst.set_state(state.clone()) {
                             Ok(_) => {
-                                let htr_res = match state {
-                                    CoolerState::Enabled => lakeshore_temp_inst.set_heater_on(),
-                                    CoolerState::Disabled => lakeshore_temp_inst.set_heater_off(),
-                                };
-
-                                if htr_res.is_err() {
-                                    log::err!("Failed to turn the Lakeshore heater on.").await;
+                                // deal with the heater
+                                match state {
+                                    CoolerState::Disabled => {
+                                        if lakeshore_temp_inst.set_heater_off().is_err() {
+                                            log::err!("Failed to turn the Lakeshore heater off.").await;
+                                        }
+                                    }
+                                    CoolerState::Enabled => {
+                                        tokio::spawn(async {
+                                            lakeshore_heater_on_task().await
+                                        });
+                                    }
                                 }
+                                // set the cooler
                                 inst_status.lock().expect("InstrumentStatus lock poisoned")
                                     .set_cooler_state_and_ui(state)
                                     .expect("UI set before this loop started.");
-                            },
+                            }
                             Err(e) => {
                                 log::err!("Failed to set cryocooler state: {}", e).await;
                                 error_dialog_helper(
                                     anyhow!("Setting cryocooler state failed. Please check connections and try again!")
                                 );
                             }
+                        }
+                    }
+                    InstrumentCommands::TurnLakeshoreHeaterOn => {
+                        if lakeshore_temp_inst.set_heater_on().is_err() {
+                            log::err!("Failed to turn the Lakeshore heater on.").await;
                         }
                     }
                     InstrumentCommands::GaugeState((gauge, state)) => {
@@ -348,6 +361,51 @@ pub async fn instruments_task(mut rx_instr: mpsc::Receiver<InstrumentCommands>) 
                         inst_status.lock().expect("InstrumentStatus lock poisoned")
                             .set_ion_pump_state_and_ui(st)
                             .expect("UI set before this loop started.");
+                    }
+                }
+            }
+            // Shutdown signal received
+            _ = rx_shutdown.recv() => {
+                break;
+            }
+        }
+    }
+}
+
+/// Task to wait for temperature to reach a certian limit and turn on Lakeshore Heater.
+pub async fn lakeshore_heater_on_task() {
+    let prg_config = get_prg_conf_wait().await;
+    let inst_status = get_inst_status_wait().await;
+
+    let mut rx_shutdown = crate::HALT_SENDER.get().unwrap().subscribe();
+
+    loop {
+        tokio::select! {
+            _ = tokio::time::sleep(Duration::from_secs(5)) => {
+                let (temperature_setpoint, temperature_safety_half_band) = {
+                    let guard = prg_config.lock().expect("PrgConf Mutex poisoned");
+                    (
+                        guard.get_samle_setpoint_temperature(),
+                        guard.get_safe_sample_temperature_half_band(),
+                    )
+                };
+                let (cooler_is_off, current_sample_temperature) = {
+                    let guard = inst_status.lock().expect("InstStatus Mutex poisoned");
+                    (guard.is_cryo_cooler_off(), guard.get_sample_temperature())
+                };
+
+                if cooler_is_off {
+                    break;
+                }
+
+                if current_sample_temperature < temperature_setpoint + temperature_safety_half_band {
+                    if send_instr_cmd_w_err(InstrumentCommands::TurnLakeshoreHeaterOn)
+                        .await
+                        .is_err()
+                    {
+                        log::err!("Could not turn Lakeshore heater on.").await;
+                    } else {
+                        break;
                     }
                 }
             }
