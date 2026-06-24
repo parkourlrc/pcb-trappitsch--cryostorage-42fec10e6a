@@ -8,7 +8,7 @@ use std::{
 };
 
 use anyhow::{Result, anyhow};
-use measurements::Temperature;
+use measurements::{Temperature, TemperatureDelta};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -164,11 +164,8 @@ impl PrgConfig {
     /// Get the max safe sample temperature.
     ///
     /// Returns the minimum and maximum safe sample temperatures as a tule.
-    pub fn get_safe_sample_temperatures(&self) -> (Temperature, Temperature) {
-        (
-            self.safety_warnings.min_safe_sample_temperature,
-            self.safety_warnings.max_safe_sample_temperature,
-        )
+    pub fn get_safe_sample_temperature_half_band(&self) -> TemperatureDelta {
+        self.safety_warnings.safe_sample_temperature_half_band
     }
 
     /// Get a clone of the Omnicontrol configuration.
@@ -411,15 +408,19 @@ pub struct SafeRangeLimits {
 /// in the system when they are under or overstepped.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SafetyWarnings {
-    pub min_safe_sample_temperature: Temperature,
-    pub max_safe_sample_temperature: Temperature,
+    __doc_safe_sample_temperature_half_band: String,
+    pub safe_sample_temperature_half_band: TemperatureDelta,
 }
 
 impl Default for SafetyWarnings {
     fn default() -> Self {
         Self {
-            min_safe_sample_temperature: Temperature::from_kelvin(110.),
-            max_safe_sample_temperature: Temperature::from_kelvin(130.),
+            __doc_safe_sample_temperature_half_band: String::from(
+                "
+If the sample is withing plus/minus this temperature, we call the temperature safe.
+",
+            ),
+            safe_sample_temperature_half_band: TemperatureDelta::from_kelvin(10.0),
         }
     }
 }

@@ -14,7 +14,7 @@
 
 use std::sync::atomic::Ordering;
 
-use measurements::Temperature;
+use measurements::{Temperature, TemperatureDelta};
 
 use crate::{
     app::UI,
@@ -34,13 +34,19 @@ use crate::{
 // If any of these conditions are not met, the buzzer is activated and the and an error dialog is
 // raised. This error dialog should describe the problem and, when confirmed, pause the buzzer and
 // safety check for some time for the user to fix the issue.
-pub fn sample_safety(inst_stat: &InstrumentStatus, safe_temps: (&Temperature, &Temperature)) {
+pub fn sample_safety(
+    inst_stat: &InstrumentStatus,
+    temperature_setpoint: &Temperature,
+    safe_temperature_half_band: &TemperatureDelta,
+) {
     // skip any safety check if the cryocooler is off or the alarm is muted.
     if inst_stat.is_cryo_cooler_off() || IS_ALARM_MUTED.load(Ordering::Relaxed) {
         return;
     }
 
-    if let Err(err_msg) = check_sample_safe(inst_stat, safe_temps) {
+    if let Err(err_msg) =
+        check_sample_safe(inst_stat, temperature_setpoint, safe_temperature_half_band)
+    {
         buzzer().turn_on();
 
         // If UI is not yet set, the alarm will trigger again the next time around.
@@ -66,16 +72,19 @@ pub fn sample_safety(inst_stat: &InstrumentStatus, safe_temps: (&Temperature, &T
 /// - Err() describing the problem (user displayable) if the sample is not safe.
 pub fn check_sample_safe(
     inst_stat: &InstrumentStatus,
-    safe_temps: (&Temperature, &Temperature),
+    temperature_setpoint: &Temperature,
+    safe_temperature_half_band: &TemperatureDelta,
 ) -> Result<(), String> {
-    let (min_safe_temp, max_safe_temp) = safe_temps;
+    let sample_temp_curr = inst_stat.get_sample_temperature();
+    let min_safe_temp = *temperature_setpoint - *safe_temperature_half_band;
+    let max_safe_temp = *temperature_setpoint + *safe_temperature_half_band;
 
+    // rest of the checks that would raise an alarm
     let wf = inst_stat.is_water_flow_ok();
     let ip = inst_stat.is_ion_pump_on();
     let ps = inst_stat.is_pumpstand_on();
-    let sample_temp_curr = inst_stat.get_sample_temperature();
     let sample_temp_chk =
-        (*min_safe_temp <= sample_temp_curr) && (sample_temp_curr <= *max_safe_temp);
+        (min_safe_temp <= sample_temp_curr) && (sample_temp_curr <= max_safe_temp);
 
     if wf && ip && ps && sample_temp_chk {
         return Ok(());

@@ -162,16 +162,22 @@ pub async fn instruments_task(mut rx_instr: mpsc::Receiver<InstrumentCommands>) 
     } // drop lock
 
     // Get the max safe sample temperature from the program configuration (only needed once).
-    let (min_safe_sample_temp, max_safe_sample_temp) = prg_conf
-        .lock()
-        .expect("ProgramConfig lock poisoned")
-        .get_safe_sample_temperatures();
+    let (temp_safety_half_band, temp_setpoint) = {
+        let guard = prg_conf.lock().expect("ProgramConfig lock poisoned");
+        (
+            guard.get_safe_sample_temperature_half_band(),
+            guard.get_samle_setpoint_temperature(),
+        )
+    };
 
     // set the max temperature to the ui
     let ui = get_ui_wait().await;
-    ui.upgrade_in_event_loop(move |ui| {
-        ui.global::<Logic>()
-            .set_max_safe_temperature(max_safe_sample_temp.as_kelvin() as f32);
+    ui.upgrade_in_event_loop({
+        let max_safe_sample_temp = temp_setpoint + temp_safety_half_band;
+        move |ui| {
+            ui.global::<Logic>()
+                .set_max_safe_temperature(max_safe_sample_temp.as_kelvin() as f32);
+        }
     })
     .expect("UI is alive");
 
@@ -263,7 +269,7 @@ pub async fn instruments_task(mut rx_instr: mpsc::Receiver<InstrumentCommands>) 
                 let smpls_empty = prg_conf.lock().expect("ProgramConfig lock poisoned").is_samples_empty();
                 if !smpls_empty {
                     let is = inst_status.lock().expect("InstrumentStatus lock poisoned");
-                    sample_safety(&is, (&min_safe_sample_temp, &max_safe_sample_temp));
+                    sample_safety(&is, &temp_setpoint, &temp_safety_half_band);
                 }
 
                 // after init, set polling interval to normal value
