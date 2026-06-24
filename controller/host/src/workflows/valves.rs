@@ -76,11 +76,15 @@ fn get_open_valve_permission(
 /// check already there.
 #[derive(Error, Debug)]
 pub enum OpenValvePermissionError {
-    #[error("One or more gauges are unreachable")]
+    #[error("Cannot open valve. One or more gauges are unreachable")]
     GaugeError,
-    #[error("Pressure in chamber is much smaller than pressure in transfer system.")]
+    #[error(
+        "Cannot open valve. Pressure in chamber is much smaller than pressure in transfer system."
+    )]
     ChamberPressureTooLow,
-    #[error("Pressure in chamber is much larger than pressure in transfer system.")]
+    #[error(
+        "Cannot open valve. Pressure in chamber is much larger than pressure in transfer system."
+    )]
     ChamberPressureTooHigh,
 }
 

@@ -303,7 +303,7 @@ impl Default for OpenValveAuthorization {
                 "Authorization given if: lower_limit < Gauge1/Gauge2 < upper_limit.",
             ),
             valve_ratio_range: SafeRangeLimits {
-                lower_limit: 0.001,
+                lower_limit: 0.01,
                 upper_limit: 100.0,
             },
             __doc_low_pressure_limit: String::from(

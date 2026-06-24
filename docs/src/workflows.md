@@ -62,6 +62,14 @@ this workflow as well.
 
 ## Start cryocooler
 
+> [!WARNING]
+> Due to an electronics design error, the water safety
+> can currently not be read by the firmware.
+> However, the cryocooler is still properly interlocked with the water cooling;
+> only the software check is currently disabled.
+>
+> *2026-06-24*
+
 ```mermaid
   flowchart TD
     T[Start cryocooler] --> WS{{Water safety okay}}
@@ -216,7 +224,9 @@ are the same as the ones for valve authorization.
     PCHK -->|Timeout| StPP[/Stop primary pump/] --> Err
     PCHK -->|True| IPTIM
     IPTIM --> |Cancel| Err
-    IPTIM[/Wait 2h\] --> IP
+    IPTIM[/Wait 2h\] --> IPPcheck
+    IPPcheck{{p<sub>ch</sub> < 1e-5 mbar?}} -->|No| Err
+    IPPcheck -->|Yes| IP
     IP[/Start Ion Pump/] -->
     ValveTim --> |Cancel| Err
     ValveTim[/Wait 1min\] --> Valve
@@ -355,15 +365,14 @@ prevents the transfer valve from closing before the VCT valves are closed.
     RDY[/Set "VCT ready" status/] --> N2Not
     N2Not@{ shape: paper-tape, label: "Fill N<sub>2</sub> balloon."} -->|Next| ClPump
     ClPump[/Close pump valve/] --> NAtt
-    NAtt@{ shape: paper-tape, label: "Notify user to dock VCT and click attach button."} -->|Cancel| NRDY
-    NRDY[/Unset "VCT ready" status/] --> Err
+    NAtt@{ shape: paper-tape, label: "Notify user to dock VCT and click attach button."} -->|Cancel| Err 
     NAtt -->|Next| CHKOP[\"Check for 10min
               VCT valves open 
               AND 
               p<sub>tr</sub> < 1e-5mbar"/]
-    CHKOP -->|Timeout| NRDY
+    CHKOP -->|Timeout| Err 
     CHKOP -->|True| NotifyOpTr
-    NotifyOpTr@{ shape: paper-tape, label: "System ready. Click next to open transfer valve."} -->|Cancel| NRDY
+    NotifyOpTr@{ shape: paper-tape, label: "System ready. Click next to open transfer valve."} -->|Cancel| Err 
     NotifyOpTr -->|Next| OpTrV
     OpTrV[/Open transfer valve/] --> WaitForDet
     WaitForDet[/Wait for detach: no time limit; instruct user to transfer sample, retract arm, click detach.\] -->|Cancel| NRDY

@@ -63,9 +63,11 @@ pub async fn sample_transfer_workflow(auths: &Authorizations) {
         .is_err()
     {
         // Set VCT not ready to attach status.
-        send_cntrl_cmd(ControllerCommands::VctHandshake(VctHandshake::NotReady)).await;
-        wp.finalize("Sample transfer cancelled. All is back to normal.", false)
-            .await;
+        wp.finalize(
+            "Sample transfer cancelled. The VCT status was left in \"EM Ready\" mode.",
+            true,
+        )
+        .await;
         return;
     }
 
@@ -109,11 +111,10 @@ pub async fn sample_transfer_workflow(auths: &Authorizations) {
     if wp.check_for(dur, &msg, check).await.is_err() {
         wp.show_vacuum_plot(false);
         wp.finalize(
-            "Failed to attach and pump the VCT. Detach the shuttle before clicking Done.",
+            "Failed to attach and pump the VCT.  The VCT status was left in \"EM Ready\" mode.",
             true,
         )
         .await;
-        send_cntrl_cmd(ControllerCommands::VctHandshake(VctHandshake::NotReady)).await;
         return;
     }
     wp.show_vacuum_plot(false);
@@ -129,11 +130,10 @@ pub async fn sample_transfer_workflow(auths: &Authorizations) {
         .is_err()
     {
         wp.finalize(
-            "Sample transfer cancelled. Please detach the shuttle before clicking Done.",
-            false,
+            "Sample transfer cancelled. The VCT status was left in \"EM Ready\" mode.",
+            true,
         )
         .await;
-        send_cntrl_cmd(ControllerCommands::VctHandshake(VctHandshake::NotReady)).await;
         return;
     }
 
@@ -158,11 +158,10 @@ pub async fn sample_transfer_workflow(auths: &Authorizations) {
     if wp.check_for_infinite_time(msg, check).await.is_err() {
         wp.finalize(
             "Could not detach the VCT from the cryostorage chamber. The transfer valve stays open. \
-               Clicking Done will disable readyness to attach/detach the shuttle.",
+                The VCT status was left in \"EM Ready\" mode.",
             true,
         )
         .await;
-        send_cntrl_cmd(ControllerCommands::VctHandshake(VctHandshake::NotReady)).await;
         return;
     }
 

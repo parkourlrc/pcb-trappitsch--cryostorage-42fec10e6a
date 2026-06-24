@@ -147,7 +147,7 @@ pub async fn pump_chamber_workflow(auths: &Authorizations) {
         return;
     }
 
-    // Now wait for a pre-defined time to turn on ion pump.
+    // Now wait for a pre-defined time, check pressure again, then turn on ion pump.
     let dur = auths.pump_chamber.timer_ion_pump;
     let msg = "Waiting until the timer expires to turn on the ion pump. \
             If you press cancel before, the ion pump will not be turned on.";
@@ -155,6 +155,20 @@ pub async fn pump_chamber_workflow(auths: &Authorizations) {
     if wp.wait_for(dur, msg).await.is_err() {
         wp.finalize(
             "Waiting for ion pump turn on was cancelled. The ion pump was not turned on.",
+            true,
+        )
+        .await;
+        return;
+    }
+
+    // check the pressure again, if not <1e-5, error out and do not turn ion pump on.
+    let ppp_limit = auths.pump_chamber.pressure_limit_primary_pump;
+    let (p_ch, _) = inst_status.lock().expect("Poisoned").get_pressures();
+    if let PressureReading::Value(p) = p_ch
+        && p > ppp_limit
+    {
+        wp.finalize(
+            "Chamber pressure is not below the safe limit. Ion pump was not turned on.",
             true,
         )
         .await;
