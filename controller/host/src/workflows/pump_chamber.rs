@@ -64,20 +64,7 @@ pub async fn pump_chamber_workflow(auths: &Authorizations) {
             )),
             OpenValvePermissionError::ChamberPressureTooLow => eq_pch_too_low(&mut wp, auths).await,
             OpenValvePermissionError::ChamberPressureTooHigh => {
-                let mut res = eq_pch_too_high(&mut wp, auths, false).await;
-                // close vent valve if we are in p_ch >> p_tr and the outcome of the equalizing
-                // workflow was ok
-                if res.is_ok()
-                    && send_hicube_cmd_w_err(HiCubeCommands::SetVentingValveState(ValveState::Open))
-                        .await
-                        .is_err()
-                {
-                    res = Err(anyhow!(
-                        "Pressure in transfer and sample chamber was equalized but the vent valve could not be closed. \
-                            Thus, the pumping workflow cannot be continued."
-                    ))
-                };
-                res
+                eq_pch_too_high(&mut wp, auths, true).await
             }
         };
 
@@ -107,18 +94,18 @@ pub async fn pump_chamber_workflow(auths: &Authorizations) {
     };
 
     // Wait for pre-defined time to reach a pressure limit for continuing.
-    let ppp_limit = auths.pump_chamber.pressure_limit_primary_pump;
+    let ppp_limit = auths.pump_chamber.pressure_limit_primary_pump_mbar;
     let dur = auths.pump_chamber.timer_primary_pump;
     let msg = format!(
         "Waiting for chamber pressure to drop below {:e} mbar.",
-        ppp_limit.as_millibars()
+        ppp_limit
     );
     let check = {
         let inst_status = Arc::clone(&inst_status);
         move || -> bool {
             let (p_ch, _) = inst_status.lock().expect("Poisoned").get_pressures();
             if let PressureReading::Value(p) = p_ch {
-                p < ppp_limit
+                p.as_millibars() < ppp_limit
             } else {
                 false
             }
@@ -130,7 +117,7 @@ pub async fn pump_chamber_workflow(auths: &Authorizations) {
         wp.show_vacuum_plot(false);
         let mut msg = format!(
             "Did not reach a pressure of {:e} mbar in the alotted time.",
-            ppp_limit.as_millibars()
+            ppp_limit
         );
 
         // turn pump stand off.
@@ -162,10 +149,10 @@ pub async fn pump_chamber_workflow(auths: &Authorizations) {
     }
 
     // check the pressure again, if not <1e-5, error out and do not turn ion pump on.
-    let ppp_limit = auths.pump_chamber.pressure_limit_primary_pump;
+    let ppp_limit = auths.pump_chamber.pressure_limit_primary_pump_mbar;
     let (p_ch, _) = inst_status.lock().expect("Poisoned").get_pressures();
     if let PressureReading::Value(p) = p_ch
-        && p > ppp_limit
+        && p.as_millibars() > ppp_limit
     {
         wp.finalize(
             "Chamber pressure is not below the safe limit. Ion pump was not turned on.",

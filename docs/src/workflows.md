@@ -166,10 +166,11 @@ i.e., it will close the vent valve.
     OPAuth{{Pump valve authorization?}}
     OPAuth -->|Yes| OP
     OPAuth -->|No| PCL
+    PCLW-->|Success| StIP
+    PCHW -->|Success| StIP
     OP[/Open pump valve/]
     OP --> StIP
     IsOP -->|Yes| StIP
-    PCHW -->|Success| VVT
     StIP[/Stop ion pump/] --> StPP
     StPP[/Stop primary pump/] --> OVV
     OVV[/Open vent valve/] --> VVT
@@ -188,7 +189,7 @@ i.e., it will close the vent valve.
     PCL{{p<sub>ch</sub>/p<sub>tr</sub> < 0.01}} -->|Yes| PCLW
     end
     PCLW -->|Failure| Err
-    PCLW[[p<sub>ch</sub> << p<sub>tr</sub>]] -->|Success| StIP
+    PCLW[[p<sub>ch</sub> << p<sub>tr</sub>]] 
     PCHW -->|Failure| Err
 ```
 
@@ -244,12 +245,11 @@ are the same as the ones for valve authorization.
       PCH -->|No| Err
       PCH -->|Yes| PCHW
       PCHW[[p<sub>ch</sub> >> p<sub>tr</sub>]]
-      CVV[/Close vent valve/]
     end
     PCLW -->|Failure| Err
     PCLW[[p<sub>ch</sub> << p<sub>tr</sub>]] -->|Success| PP
     PCHW -->|Failure| Err
-    PCHW -->|Success| CVV --> PP 
+    PCHW -->|Success| PP
 ```
 
 ## Equalize chamber pressure
@@ -273,7 +273,8 @@ which is in the flowchart set to 20 minutes.
 ```mermaid
   flowchart TD
     WF[p_<sub>ch</sub> << p_<sub>tr</sub>] --> PP
-    PP[/Start primary pump/] --> TIM 
+    PP[/"Close vent valve &
+        Start primary pump"/] --> TIM 
 
     TIM[\"Check for 20min
         p<sub>ch</sub>/p<sub>tr</sub> > 0.01
@@ -294,12 +295,17 @@ which is in the flowchart set to 20 minutes.
 If the chamber pressure is too high, i.e., if
 \\[ \frac{p_\text{ch}}{p_\text{tr}} > 100, \\]
 the transfer system might be currently pumped and must first be vented.
+Since venting is too fast,
+this workflow first vents the transfer system
+until p<sub>tr</sub> > p<sub>ch</sub>.
+It then jumps into the
+"chamber pressure low" workflow.
 
 Again, all pressure conditions in below flowchart
 come from the open valve authorization.
 The only adjustable setting is the timer.
 
-Optionally, this workflow will display a messaget to the user
+Optionally, this workflow will display a message to the user
 to fill the nitrogen balloon for venting.
 This notification is only necessary if the workflow is called
 from the "pump down" workflow.
@@ -322,12 +328,12 @@ In the "vent" workflow, this message has already been given before.
     OVV[/Open vent valve/] --> TIM
 
     TIM[\"Check for 20min
-      p<sub>ch</sub>/p<sub>tr</sub> < 100"/]
-    TIM -->|Timeout| CVV[/Close vent valve/] --> Err
+      p<sub>tr</sub> >= p<sub>ch</sub>"/]
+    TIM -->|Timeout| Err
     TIM -->|True| Ok
 
     subgraph Level3 [Final]
-      Ok[/Open pump valve/]
+      Ok[[p_<sub>ch</sub> << p_<sub>tr</sub>]]
       Err[/Abort/]
     end
 ```

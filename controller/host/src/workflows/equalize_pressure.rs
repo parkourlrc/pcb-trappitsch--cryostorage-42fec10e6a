@@ -3,6 +3,8 @@
 //! All of these shared workflows come into play when opening valves is not authorized. This means
 //! the pressure is to uneven between the two sides and must first be equalized.
 
+use std::sync::Arc;
+
 use anyhow::{Result, anyhow};
 use icd::ValveState;
 
@@ -48,15 +50,15 @@ pub async fn eq_pch_too_high(
     // stop the pumps and open the vent valve
     stop_pumps_open_vv().await?;
 
-    // set up the with the escape check and the time.
+    // set up the escape check and the time.
     let check = {
-        let cmp_ratio_ul = auths.open_valve.valve_ratio_range.upper_limit;
+        let inst_status = Arc::clone(&inst_status);
         move || -> bool {
             let (p_chamber, p_transfer) = inst_status.lock().expect("Poisoned").get_pressures();
             if let PressureReading::Value(pch) = p_chamber
                 && let PressureReading::Value(ptr) = p_transfer
             {
-                pch.as_millibars() / ptr.as_millibars() < cmp_ratio_ul
+                pch.as_millibars() <= ptr.as_millibars()
             } else {
                 false
             }
@@ -69,24 +71,14 @@ pub async fn eq_pch_too_high(
 
     wp.show_vacuum_plot(true);
 
-    let res = match wp.check_for(tim_duration, msg, check).await {
-        Ok(_) => {
-            send_cntrl_cmd(ControllerCommands::PumpValve(ValveState::Open)).await;
-            Ok(())
-        }
-        Err(_) => {
-            let _ =
-                send_hicube_cmd_w_err(HiCubeCommands::SetVentingValveState(ValveState::Open)).await;
-            Err(anyhow!(
-                "Could not equalize the pressure within the given time. \
-                Closing vent valve and stopping here."
-            ))
-        }
+    if wp.check_for(tim_duration, msg, check).await.is_err() {
+        let _ = send_hicube_cmd_w_err(HiCubeCommands::SetVentingValveState(ValveState::Open)).await;
+        return Err(anyhow!(
+            "Venting transfer system to start equalizing pressures failed."
+        ));
     };
 
-    wp.show_vacuum_plot(false);
-
-    res
+    eq_pch_too_low(wp, auths).await
 }
 
 /// Equalize the pressure if p_chamber << p_transfer.
@@ -106,7 +98,8 @@ pub async fn eq_pch_too_high(
 pub async fn eq_pch_too_low(wp: &mut WorkflowProgress, auths: &Authorizations) -> Result<()> {
     let inst_status = get_inst_status_wait().await;
 
-    // start the primary pump
+    // close vent valve and start the primary pump
+    send_hicube_cmd_w_err(HiCubeCommands::SetVentingValveState(ValveState::Closed)).await?;
     send_hicube_cmd_w_err(HiCubeCommands::SetPumpStandState(PumpState::On)).await?;
 
     // set up the with the escape check and the time.

@@ -8,7 +8,7 @@ use std::{
 };
 
 use anyhow::{Result, anyhow};
-use measurements::{Pressure, Temperature};
+use measurements::Temperature;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -262,7 +262,7 @@ impl BakingAuthorization {
     pub fn default() -> Self {
         Self {
             __doc_max_chamber_pressure_mbar: String::from(
-                "Maximum chamber pressure allowed to start baking.",
+                "Maximum chamber pressure (in mbar) allowed to start baking.",
             ),
             max_chamber_pressure_mbar: 0.00001,
         }
@@ -272,15 +272,15 @@ impl BakingAuthorization {
 /// Authorization limits for the cryocooler.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CryoCoolerAuthorization {
-    __doc_max_pressure_on: String,
+    __doc_max_pressure_on_mbar: String,
     pub max_pressure_on_mbar: f64,
 }
 
 impl CryoCoolerAuthorization {
     pub fn default() -> Self {
         Self {
-            __doc_max_pressure_on: String::from(
-                "Authorization to turn on the cryocooler is given if the pressure in the chamber is below this limit.",
+            __doc_max_pressure_on_mbar: String::from(
+                "Authorization to turn on the cryocooler is given if the pressure (in mbar) in the chamber is below this limit.",
             ),
             max_pressure_on_mbar: 0.00001,
         }
@@ -292,7 +292,7 @@ impl CryoCoolerAuthorization {
 pub struct OpenValveAuthorization {
     __doc_valve_ratio: String,
     pub valve_ratio_range: SafeRangeLimits,
-    __doc_low_pressure_limit: String,
+    __doc_low_pressure_limit_mbar: String,
     pub low_pressure_limit_mbar: f64,
 }
 
@@ -306,8 +306,8 @@ impl Default for OpenValveAuthorization {
                 lower_limit: 0.01,
                 upper_limit: 100.0,
             },
-            __doc_low_pressure_limit: String::from(
-                "Authorization give independent of range if both gauges show pressure below the low_pressure_limit.",
+            __doc_low_pressure_limit_mbar: String::from(
+                "Authorization given independent of range if both gauges show pressure (in mbar) below the low_pressure_limit.",
             ),
             low_pressure_limit_mbar: 0.00001,
         }
@@ -319,12 +319,8 @@ impl Default for OpenValveAuthorization {
 /// For timer numbering, see the flowchart in the docs.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct VentChamberAuthorization {
-    __doc_timer_1: String,
-    pub timer_1: Duration,
-    __doc_timer_2: String,
-    pub timer_2: Duration,
-    __doc_timer_3: String,
-    pub timer_3: Duration,
+    __doc_timer_venting: String,
+    pub timer_venting: Duration,
     __doc_sample_t_min: String,
     pub sample_t_min: Temperature,
 }
@@ -332,18 +328,10 @@ pub struct VentChamberAuthorization {
 impl Default for VentChamberAuthorization {
     fn default() -> Self {
         Self {
-            __doc_timer_1: String::from(
-                "Duration to pump transfer system if its pressure is too high compared to the chamber to open the valves.",
-            ),
-            timer_1: Duration::from_mins(20),
-            __doc_timer_2: String::from(
-                "Duration to vent transfer system if its pressure is too low compared to the chamber to open the valves.",
-            ),
-            timer_2: Duration::from_mins(15),
-            __doc_timer_3: String::from(
+            __doc_timer_venting: String::from(
                 "Duration how long the vent valve should be open to vent the chamber.",
             ),
-            timer_3: Duration::from_mins(25),
+            timer_venting: Duration::from_mins(25),
             __doc_sample_t_min: String::from(
                 "Authorization is given when sample temperature is above this temperature",
             ),
@@ -357,8 +345,8 @@ impl Default for VentChamberAuthorization {
 pub struct PumpChamberAuthorization {
     __doc_timer_primary_pump: String,
     pub timer_primary_pump: Duration,
-    __doc_pressure_limit_primary_pump: String,
-    pub pressure_limit_primary_pump: Pressure,
+    __doc_pressure_limit_primary_pump_mbar: String,
+    pub pressure_limit_primary_pump_mbar: f64,
     __doc_timer_ion_pump: String,
     pub timer_ion_pump: Duration,
     __doc_timer_close_pump_valve: String,
@@ -372,10 +360,10 @@ impl Default for PumpChamberAuthorization {
                 "Duration to wait for pressure to reach the all okay level.",
             ),
             timer_primary_pump: Duration::from_mins(40),
-            __doc_pressure_limit_primary_pump: String::from(
-                "Pressure that needs to be reached within `timer_primary_pump` time.",
+            __doc_pressure_limit_primary_pump_mbar: String::from(
+                "Pressure (in mbar) that needs to be reached within `timer_primary_pump` time.",
             ),
-            pressure_limit_primary_pump: Pressure::from_millibars(1.0e-5),
+            pressure_limit_primary_pump_mbar: 0.00001,
             __doc_timer_ion_pump: String::from(
                 "Duration to wait after primary pump limit is reached before starting ion pump.",
             ),
@@ -441,8 +429,8 @@ impl Default for SafetyWarnings {
 pub struct SampleTransferAuthorization {
     __doc_timer: String,
     pub timer: Duration,
-    __doc_pressure_max: String,
-    pub pressure_max: Pressure,
+    __doc_pressure_max_mbar: String,
+    pub pressure_max_mbar: f64,
     __doc_cnt_pressure_readings: String,
     pub cnt_pressure_readings: u8,
 }
@@ -454,10 +442,10 @@ impl Default for SampleTransferAuthorization {
                 "Max duration to check for pressure and VCT valve status to open transfer valve.",
             ),
             timer: Duration::from_mins(10),
-            __doc_pressure_max: String::from(
-                "Transfer system pressure must be below this limit to open transfer valve.",
+            __doc_pressure_max_mbar: String::from(
+                "Transfer system pressure (in mbar) must be below this limit to open transfer valve.",
             ),
-            pressure_max: Pressure::from_millibars(0.00001),
+            pressure_max_mbar: 0.00001,
             __doc_cnt_pressure_readings: String::from(
                 "Number of pressure readings (1 per second) that need to be below limit in a row to continue sample transfer.",
             ),

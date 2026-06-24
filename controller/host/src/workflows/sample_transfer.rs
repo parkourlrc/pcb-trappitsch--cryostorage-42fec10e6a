@@ -73,28 +73,28 @@ pub async fn sample_transfer_workflow(auths: &Authorizations) {
 
     let dur = auths.sample_transfer.timer;
     let msg = format!(
-        "Waiting for pressure in transfer chamber to fall below {:.1E} mbar and for VCT valves to open. \
+        "Waiting for pressure in transfer chamber to fall below {:.1e} mbar and for VCT valves to open. \
         If you press cancel, the transfer valve will not open and you will have to manually unset the \"VCT ready\" status.",
-        auths.sample_transfer.pressure_max.as_millibars()
+        auths.sample_transfer.pressure_max_mbar
     );
 
     PREAD_COUNTER.store(0, Ordering::Relaxed);
 
     let check = {
         let inst_status = Arc::clone(&inst_status);
-        let p_max = auths.sample_transfer.pressure_max;
+        let p_max = auths.sample_transfer.pressure_max_mbar;
         let cnt_pressure_readings = auths.sample_transfer.cnt_pressure_readings;
         move || -> bool {
             let guard = inst_status.lock().expect("InstrumentStatus lock poisoned");
             let is_attached = guard.is_vct_gate_open();
             if let (_p_ch, PressureReading::Value(p_tr)) = guard.get_pressures() {
                 // Counter here is ~seconds, it's an empirical value. Might need tuning.
-                if (p_tr < p_max)
+                if (p_tr.as_millibars() < p_max)
                     && is_attached
                     && PREAD_COUNTER.load(Ordering::Relaxed) >= cnt_pressure_readings
                 {
                     true
-                } else if (p_tr < p_max) && is_attached {
+                } else if (p_tr.as_millibars() < p_max) && is_attached {
                     let _cnt = PREAD_COUNTER.fetch_add(1, Ordering::Relaxed);
                     false
                 } else {

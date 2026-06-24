@@ -114,7 +114,7 @@ async fn vent_chamber(wp: &mut WorkflowProgress, auths: &Authorizations) -> Resu
         Waiting for timer to close and finish venting the chamber. \
         If you hit cancel, the vent valve will immediately be closed \
         and the venting process finished.";
-    let tim_duration = auths.vent_chamber.timer_3;
+    let tim_duration = auths.vent_chamber.timer_venting;
 
     wp.show_vacuum_plot(true);
 
