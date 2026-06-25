@@ -12,17 +12,21 @@
 //! - Ion pump turned off.
 //! - Pump stand turns off.
 
-use std::sync::atomic::Ordering;
+use std::sync::{Mutex, atomic::Ordering};
 
 use measurements::{Temperature, TemperatureDelta};
+use slint::{ComponentHandle, Weak};
 
 use crate::{
-    app::UI,
+    app::{ErrorDialog, UI},
     instruments::{InstrumentCommands, send_instr_cmd_now},
     log,
-    safety::{IS_ALARM_MUTED, buzzer, show_alarm_dialog},
+    safety::{IS_ALARM_RAISED, buzzer, show_alarm_dialog},
     status::InstrumentStatus,
 };
+
+// Store the safety UI dialog here if it exists.
+static SMP_SFTY_UI: Mutex<Option<Weak<ErrorDialog>>> = Mutex::new(None);
 
 // Take a reference to an instrument status and checks if the samples are safe.
 //
@@ -41,23 +45,56 @@ pub fn sample_safety(
     safe_temperature_half_band: &TemperatureDelta,
 ) {
     // skip any safety check if the cryocooler is off or the alarm is muted.
-    if inst_stat.is_cryo_cooler_off() || IS_ALARM_MUTED.load(Ordering::Relaxed) {
+    if inst_stat.is_cryo_cooler_off() {
         return;
     }
 
-    if let Err(err_msg) =
-        check_sample_safe(inst_stat, temperature_setpoint, safe_temperature_half_band)
-    {
-        buzzer().turn_on();
+    // if let Err(err_msg) =
+    match check_sample_safe(inst_stat, temperature_setpoint, safe_temperature_half_band) {
+        Err(err_msg) => {
+            // If the alarm is not muted, go in here.
+            if !IS_ALARM_RAISED.load(Ordering::Relaxed) {
+                buzzer().turn_on();
 
-        // If UI is not yet set, the alarm will trigger again the next time around.
-        if let Some(ui) = UI.get() {
-            ui.upgrade_in_event_loop(move |_| {
-                if let Err(e_show) = show_alarm_dialog(err_msg, Some(&IS_ALARM_MUTED)) {
-                    log::err_now!("Failed to show alarm dialog: {}", e_show);
-                };
-            })
-            .expect("UI must be alive");
+                // If UI is not yet set, the alarm will trigger again the next time around.
+                if let Some(ui) = UI.get() {
+                    ui.upgrade_in_event_loop(move |_| {
+                        match show_alarm_dialog(err_msg, Some(&IS_ALARM_RAISED)) {
+                            Ok(dialog) => {
+                                let mut guard = SMP_SFTY_UI.lock().expect("Not poisoned");
+                                *guard = Some(dialog);
+                            }
+                            Err(e_show) => log::err_now!("Failed to show alarm dialog: {}", e_show),
+                        };
+                    })
+                    .expect("UI must be alive");
+                }
+            }
+        }
+        Ok(_) => {
+            // so we recovered automatically
+            if IS_ALARM_RAISED
+                .compare_exchange(true, false, Ordering::Relaxed, Ordering::Relaxed)
+                .is_ok()
+            {
+                buzzer().turn_off();
+                if let Some(ui) = UI.get() {
+                    ui.upgrade_in_event_loop({
+                        move |_| {
+                            let mut guard = SMP_SFTY_UI.lock().expect("Not poisoned");
+                            if let Some(wdr) = &*guard {
+                                let wd = wdr.clone();
+                                if let Some(diag) = wd.upgrade() {
+                                    let _ = diag.hide();
+                                }
+                            }
+                            *guard = None;
+                        }
+                    })
+                    .expect("UI is running");
+                }
+                log::info_now!("Sample safety has been restored automatically.");
+            }
         }
     }
 }
@@ -98,19 +135,28 @@ pub fn check_sample_safe(
         return Ok(());
     }
 
-    // create the failure string:
+    // if alarm is already raised, we do nothing with this error message.
+    if IS_ALARM_RAISED.load(Ordering::Relaxed) {
+        return Err(String::from("Alarm already raised."));
+    }
+
+    // so we need to fail with a proper error message.
     let mut err_msg = String::from(
         "The following component(s) have failed, which puts the sample in jeopardy.\n",
     );
+    let mut log_msg = String::from("Sample safety alarm errors: ");
     // FIXME: Add waterflow back in
     // if !wf {
     //     err_msg.push_str("- Waterflow for cooler is not maintained.\n");
+    //     log_msg.push_str("Water flow; ");
     // }
     if !ip {
         err_msg.push_str("- Ion pump is not turned on.\n");
+        log_msg.push_str("Ion pump; ");
     }
     if !ps {
         err_msg.push_str("- Pump stand is not on.\n");
+        log_msg.push_str("HiCube; ");
     }
     if !sample_temp_chk {
         err_msg.push_str(&format!(
@@ -119,6 +165,9 @@ pub fn check_sample_safe(
             min_safe_temp.as_kelvin(),
             max_safe_temp.as_kelvin(),
         ));
+        log_msg.push_str("Sample temperature;");
     }
+
+    log::warning_now!(&log_msg);
     Err(err_msg)
 }

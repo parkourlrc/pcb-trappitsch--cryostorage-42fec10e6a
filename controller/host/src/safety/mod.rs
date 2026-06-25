@@ -12,7 +12,7 @@ pub use sample_safety::sample_safety;
 pub use test_alarm::test_alarm;
 
 use anyhow::Result;
-use slint::ComponentHandle;
+use slint::{ComponentHandle, Weak};
 
 use std::{
     fmt::Display,
@@ -25,7 +25,7 @@ use tokio::time::sleep;
 use crate::app::ErrorDialog;
 
 /// Duration and status of alarm muting.
-pub static IS_ALARM_MUTED: AtomicBool = AtomicBool::new(false);
+pub static IS_ALARM_RAISED: AtomicBool = AtomicBool::new(false);
 static ALARM_PAUSE: Duration = Duration::from_mins(5);
 
 /// This routine can be spawned in order to pause a given alarm an let the user fix things.
@@ -36,7 +36,7 @@ static ALARM_PAUSE: Duration = Duration::from_mins(5);
 async fn pause_sfty(is_alarm_muted: &'static AtomicBool) {
     buzzer().turn_off();
     sleep(ALARM_PAUSE).await;
-    is_alarm_muted.store(true, std::sync::atomic::Ordering::Relaxed);
+    is_alarm_muted.store(false, std::sync::atomic::Ordering::Relaxed);
 }
 
 /// Show an alarm dialog with a given message.
@@ -51,7 +51,7 @@ async fn pause_sfty(is_alarm_muted: &'static AtomicBool) {
 pub fn show_alarm_dialog<D: Display>(
     msg: D,
     is_alarm_muted: Option<&'static AtomicBool>,
-) -> Result<()> {
+) -> Result<Weak<ErrorDialog>> {
     let dialog = ErrorDialog::new()?;
 
     let msg = format!(
@@ -84,5 +84,5 @@ pub fn show_alarm_dialog<D: Display>(
     }
 
     dialog.show()?;
-    Ok(())
+    Ok(dialog.as_weak())
 }

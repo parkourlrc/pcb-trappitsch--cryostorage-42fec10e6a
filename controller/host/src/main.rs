@@ -34,7 +34,7 @@ pub static CONFIG_FOLDER: OnceCell<PathBuf> = OnceCell::const_new(); // config f
 pub static ARCHIVE_FOLDER: OnceCell<PathBuf> = OnceCell::const_new(); // archive of config files, logs
 pub const LOG_ROTATION_DURATION: Duration = Duration::from_secs(7 * 24 * 3600); // Duration between log rot.
 
-pub const LOG_LEVEL_DISPLAY: log::Level = log::Level::Warning;
+pub const LOG_LEVEL_DISPLAY: log::Level = log::Level::Info;
 
 pub static HALT_SENDER: OnceCell<broadcast::Sender<()>> = OnceCell::const_new();
 
