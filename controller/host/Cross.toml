@@ -1,0 +1,23 @@
+[build]
+pre-build = [
+  "dpkg --add-architecture $CROSS_DEB_ARCH",
+  """apt-get update && apt-get --assume-yes install \
+    qemu-user-static \
+    binfmt-support \
+    libudev-dev:$CROSS_DEB_ARCH \
+    libseat-dev:$CROSS_DEB_ARCH \
+    libxkbcommon-dev:$CROSS_DEB_ARCH \
+    libgbm-dev:$CROSS_DEB_ARCH \
+    libinput-dev:$CROSS_DEB_ARCH""",
+
+  # Make sure binfmt support exists in the container
+  # "apt-get install -y binfmt-support",
+
+  # Register handlers
+  # "update-binfmts --enable qemu-aarch64 || true",
+  #
+  # # libinput-dev
+  # "apt-get install -y ",
+  # "apt-get install -y libinput-dev:$CROSS_DEB_ARCH",
+]
+default-target = "aarch64-unknown-linux-gnu"

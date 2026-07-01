@@ -1,0 +1,42 @@
+set shell := ["fish", "-c"]
+
+TIMESTAMP := `date +"%Y-%m-%dT%H:%M:%S"`
+
+[doc("List all just actions")]
+default:
+  @just --list
+
+[doc("Development release: Cross compile and copy to Switch drive")]
+@dev_release: cross copy_to_switch_drive
+
+[doc("If repo is clean, cross compile and release on Gitlab.")]
+@gitlab_release: check-dirty cross
+    # move main tag to the the last commit (this one is clean)
+    jj b m main -t @-
+    jj git push
+
+    git tag {{TIMESTAMP}}
+    git push origin {{TIMESTAMP}}
+
+    glab release create $TODAY \
+    --title "Cryostorage Host" \
+    --notes "Release of the aarch64 host binary for the cryostorage chamber." \
+    --assets-link "path=target/aarch64-unknown-linux-gnu/release/host,name=cryostorage_host_aarch64"
+
+[doc("Cross build for aarch64 in release mode.")]
+@cross:
+    cross build --release
+
+[doc("Check if the repo is dirty and if it is, abort.")]
+@check-dirty:
+    if jj status | rg -q "Working copy changes:"; then \
+        echo "⚠️  The jj repository is dirty – uncommitted changes detected."; \
+        exit 1; \
+    fi
+
+[doc("Copy the released file to the SwitchDrive and add a timestamp. Asks for confirmation.")]
+[confirm("Copy to drive? (y/N)")]
+@copy_to_switch_drive:
+  cp target/aarch64-unknown-linux-gnu/release/host ~/switchDrive/Institution/cryostorage_release/cryostorage_host
+  echo {{TIMESTAMP}} > ~/switchDrive/Institution/cryostorage_release/timestamp.txt
+
