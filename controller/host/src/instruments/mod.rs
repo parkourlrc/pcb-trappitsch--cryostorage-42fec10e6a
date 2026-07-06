@@ -117,10 +117,14 @@ pub async fn instruments_task(mut rx_instr: mpsc::Receiver<InstrumentCommands>) 
     let _ = get_ui_wait().await;
 
     // Set the instrument initial states cryocooler
-    let sample_setpoint_temperature = inst_status
-        .lock()
-        .expect("InstStatus mutex poisoned")
-        .get_temperature_setpoint();
+    let sample_setpoint_temperature = match lakeshore_temp_inst.get_heater_temperature() {
+        Ok(t) => t,
+        Err(e) => {
+            log::err!("Failed to read lakeshore heater set temperature: {}", e).await;
+            lakeshore_temp_inst.reset_instrument();
+            Temperature::from_kelvin(0.0)
+        }
+    };
 
     let cooler_state = match cryocooler_inst.get_state() {
         Ok(s) => s,
@@ -164,18 +168,15 @@ pub async fn instruments_task(mut rx_instr: mpsc::Receiver<InstrumentCommands>) 
     } // drop lock
 
     // Get the max safe sample temperature from the program configuration (only needed once).
-    let (temp_safety_half_band, temp_setpoint) = {
-        let guard = prg_conf.lock().expect("ProgramConfig lock poisoned");
-        (
-            guard.get_safe_sample_temperature_half_band(),
-            guard.get_samle_setpoint_temperature(),
-        )
-    };
+    let temp_safety_half_band = prg_conf
+        .lock()
+        .expect("PrgConf lock poisoned")
+        .get_safe_sample_temperature_half_band();
 
     // set the max temperature to the ui
     let ui = get_ui_wait().await;
     ui.upgrade_in_event_loop({
-        let max_safe_sample_temp = temp_setpoint + temp_safety_half_band;
+        let max_safe_sample_temp = sample_setpoint_temperature + temp_safety_half_band;
         move |ui| {
             ui.global::<Logic>()
                 .set_max_safe_temperature(max_safe_sample_temp.as_kelvin() as f32);
@@ -271,7 +272,7 @@ pub async fn instruments_task(mut rx_instr: mpsc::Receiver<InstrumentCommands>) 
                 let smpls_empty = prg_conf.lock().expect("ProgramConfig lock poisoned").is_samples_empty();
                 if !smpls_empty {
                     let is = inst_status.lock().expect("InstrumentStatus lock poisoned");
-                    sample_safety(&is, &temp_setpoint, &temp_safety_half_band);
+                    sample_safety(&is, &sample_setpoint_temperature, &temp_safety_half_band);
                 }
 
                 // after init, set polling interval to normal value
@@ -291,10 +292,6 @@ pub async fn instruments_task(mut rx_instr: mpsc::Receiver<InstrumentCommands>) 
                             continue;
                         }
 
-                        // let's set it
-                        if prg_conf.lock().expect("PrgConf mutex poisoned").set_sample_setpoint_temperature(temperature).is_err() {
-                            log::err!("Failed to set new sample setpoint temperature to config file").await;
-                        }
                         if lakeshore_temp_inst.set_heater_temperature(temperature).is_err() {
                             log::err!("Failed to set new set tempreature to Lakeshore").await;
                             return;
@@ -382,16 +379,10 @@ pub async fn lakeshore_heater_on_task() {
     loop {
         tokio::select! {
             _ = tokio::time::sleep(Duration::from_secs(5)) => {
-                let (temperature_setpoint, temperature_safety_half_band) = {
-                    let guard = prg_config.lock().expect("PrgConf Mutex poisoned");
-                    (
-                        guard.get_samle_setpoint_temperature(),
-                        guard.get_safe_sample_temperature_half_band(),
-                    )
-                };
-                let (cooler_is_off, current_sample_temperature) = {
+                let temperature_safety_half_band = prg_config.lock().expect("PrgConf Mutex poisoned").get_safe_sample_temperature_half_band();
+                let (cooler_is_off, current_sample_temperature, temperature_setpoint) = {
                     let guard = inst_status.lock().expect("InstStatus Mutex poisoned");
-                    (guard.is_cryo_cooler_off(), guard.get_sample_temperature())
+                    (guard.is_cryo_cooler_off(), guard.get_sample_temperature(), guard.get_temperature_setpoint())
                 };
 
                 if cooler_is_off {

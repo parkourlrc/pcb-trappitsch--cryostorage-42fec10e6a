@@ -11,7 +11,7 @@ use measurements::{Power, Pressure, Temperature};
 use pfeiffer_hicube::PumpStandState;
 use sunpower_cryotelgt::CoolerState;
 
-use crate::{PRG_CONF, app::ValveOrPumpState, instruments::omnicontrol::GaugeStatus};
+use crate::{app::ValveOrPumpState, instruments::omnicontrol::GaugeStatus};
 
 mod controller_impls;
 mod instruments_impls;
@@ -71,20 +71,6 @@ impl InstrumentStatus {
             valve_transfer_curr: ValveState::default(),
             vct_curr: VctState::default(),
         }
-    }
-
-    /// Initialize the instrument status.
-    ///
-    /// Note: The program config and UI must be available, otherwise this will panic!
-    pub fn initialize(&mut self) {
-        let prg_config = PRG_CONF.get().expect("Program config is initialized");
-        self.set_temperature_setpoint_and_ui(
-            prg_config
-                .lock()
-                .expect("PrgConf mutex poisoned")
-                .get_samle_setpoint_temperature(),
-        )
-        .expect("UI must be set at this point");
     }
 }
 

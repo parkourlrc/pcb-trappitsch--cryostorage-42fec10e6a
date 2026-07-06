@@ -30,10 +30,16 @@ pfeiffer_hicube = { version = "0.1.0", path = "../pfeiffer_hicube" }
 # Temporary!
 agilent_4uhv = { path = "../agilent_4uhv", version = "0.1.0" }
 sunpower_cryotelgt = { path = "../cryotelgt", version = "0.1.0" }
-lakeshore_336 = { path = "../lakeshore_336", version = "0.1.0" }
 pfeiffer-omnicontrol = { path = "../pfeiffer_omnicontrol", version = "0.1.0" }
 instrumentrs = { path = "../instrumentRs", version = "0.1.0" }
+lakeshore336 = { path = "/home/reto/Documents/code/instrumentrs-drivers/lakeshore/lakeshore336", version = "0.1.0", features = [
+  "serde",
+  "serialport",
+] }
 
 [build-dependencies]
 chrono = "0.4"
 slint-build = "1"
+
+[patch.crates-io]
+measurements = { git = 'https://github.com/rust-embedded-community/rust-measurements.git' }

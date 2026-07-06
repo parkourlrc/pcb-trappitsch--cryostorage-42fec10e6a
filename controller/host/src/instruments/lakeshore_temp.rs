@@ -10,8 +10,13 @@ use std::collections::HashMap;
 
 use anyhow::{Result, bail};
 
-use instrumentrs::Instrument;
-use lakeshore_336::{Lakeshore336, SerialInterfaceLakeshore};
+use lakeshore336::{
+    Input, Lakeshore336, Output,
+    types::{
+        HeaterMaxOutputCurrent, HeaterOutputDisplay, HeaterResistance, HeaterSetup, OnPowerup,
+        OutputMode, OutputModeSetup, heater_setup::HeaterRange,
+    },
+};
 
 use measurements::Temperature;
 use serde::{Deserialize, Serialize};
@@ -22,7 +27,7 @@ use crate::instruments::utils::ThermocoupleChannelName;
 /// Cryostorage chamber's way of looking at a Lakeshore temperature controller.
 pub struct LakeshoreTempInst {
     config: LakeshoreTempConfig,
-    instrument: Option<Lakeshore336<Instrument<Box<dyn SerialPort>>>>,
+    instrument: Option<Lakeshore336<Box<dyn SerialPort>>>,
 }
 
 impl LakeshoreTempInst {
@@ -52,8 +57,8 @@ impl LakeshoreTempInst {
             None => bail!("No USB product info string provided for Lakeshore temp controller"),
         };
         let port = find_port_by_product(&product_expected)?;
-        let interface = SerialInterfaceLakeshore::simple(&port)?;
-        let instrument = Lakeshore336::try_new(interface)?;
+        let interface = lakeshore336::new_serialport(port).open()?;
+        let instrument = Lakeshore336::new(interface);
         self.instrument = Some(instrument);
         Ok(())
     }
@@ -75,7 +80,8 @@ impl LakeshoreTempInst {
             for (idx, name) in self.config.channel_iter().enumerate() {
                 // for each populated channel, get the temperature
                 if let Some(ch_name) = name {
-                    let temp_k = inst.get_channel(idx)?.get_temperature()?;
+                    let input = get_channel_input_idx(idx)?;
+                    let temp_k = inst.channel(input).get_temperature()?;
                     ret_map.insert(ch_name.clone(), temp_k);
                 }
             }
@@ -87,49 +93,67 @@ impl LakeshoreTempInst {
     }
 
     /// Set the heater to the predefined value and the given temperature.
-    ///
-    /// FIXME: This is a temporary workaround as I don't have time right now to develop the driver
     /// further.
     pub fn set_heater_on(&mut self) -> Result<()> {
         self.check_connection()?;
 
         if let Some(inst) = self.instrument.as_mut() {
-            // Set the heater setup for output 1.
-            inst.sendcmd("HTRSET 1,1,4,0,2")?;
+            let outp = self.config.heater_output_channel;
+            // Heater setup for output channel.
+            inst.output(outp)
+                .set_heater_setup(self.config.heater_setup)?;
             // set the output mode
-            inst.sendcmd("OUTMODE 1,1,1,0")?;
+            inst.output(outp)
+                .set_output_mode(self.config.heater_output_mode)?;
             // Turn the heater on.
-            inst.sendcmd("RANGE 1,2")?;
+            inst.output(outp)
+                .set_range(self.config.heater_output_range)?;
+            Ok(())
+        } else {
+            bail!(
+                "Could not set heater: Lakeshore temperature controller not connected (should be unreachable)"
+            );
         }
-        Ok(())
     }
 
     /// Turn the heater off.
-    ///
-    /// FIXME: This is a temporary workaround as I don't have time right now to develop the driver
-    /// further.
     pub fn set_heater_off(&mut self) -> Result<()> {
         self.check_connection()?;
 
         if let Some(inst) = self.instrument.as_mut() {
-            inst.sendcmd("RANGE 1,0")?;
+            inst.output(self.config.heater_output_channel)
+                .set_range(HeaterRange::Off)?;
         }
         Ok(())
     }
 
-    /// Set the heater temperature.
-    ///
-    /// Sets the temperature that is stored in the program config to the instrument.
-    ///
-    /// FIXME: This is a temporary workaround as I don't have time right now to develop the driver
-    /// further.
+    /// Get the heater setpoint temperature.
+    pub fn get_heater_temperature(&mut self) -> Result<Temperature> {
+        self.check_connection()?;
+        if let Some(inst) = self.instrument.as_mut() {
+            let temp = inst
+                .output(self.config.heater_output_channel)
+                .get_setpoint()?;
+            Ok(temp)
+        } else {
+            bail!(
+                "Could not get heater setpoint: Lakeshore temperature controller not connected (should be unreachable)"
+            );
+        }
+    }
+
+    /// Set the heater setpoint temperature.
     pub fn set_heater_temperature(&mut self, temperature: Temperature) -> Result<()> {
         self.check_connection()?;
         if let Some(inst) = self.instrument.as_mut() {
-            let cmd = format!("SETP 1,{:.1}", temperature);
-            inst.sendcmd(&cmd)?;
+            inst.output(self.config.heater_output_channel)
+                .set_setpoint(temperature)?;
+            Ok(())
+        } else {
+            bail!(
+                "Could not set heater setpoint: Lakeshore temperature controller not connected (should be unreachable)"
+            );
         }
-        Ok(())
     }
 
     /// Reset the instrument to None, so that it reconnects on the next read.
@@ -138,11 +162,25 @@ impl LakeshoreTempInst {
     }
 }
 
+/// Get the channel input based on an enumerated usize.
+///
+/// 0 -> Input::InA
+/// 1 -> Input::InB
+/// 2 -> Input::InC
+/// 3 -> Input::InD
+pub fn get_channel_input_idx(idx: usize) -> Result<Input> {
+    match idx {
+        0 => Ok(Input::InA),
+        1 => Ok(Input::InB),
+        2 => Ok(Input::InC),
+        3 => Ok(Input::InD),
+        _ => bail!("Channel input out of range."),
+    }
+}
+
 /// Configuration to store for the Lakeshore temperature controller.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct LakeshoreTempConfig {
-    /// Target temperature for the heater.
-    pub sample_temperature_heater: Temperature,
     /// USB product info string to identify the device for automatic port detection.
     pub usb_prod_info: Option<String>,
     /// Channel 1/A name, or None if not present.
@@ -153,6 +191,14 @@ pub struct LakeshoreTempConfig {
     pub channel_c_name: Option<ThermocoupleChannelName>,
     /// Channel 4/D name, or None if not present.
     pub channel_d_name: Option<ThermocoupleChannelName>,
+    /// The output channel used for heater.
+    pub heater_output_channel: Output,
+    /// Setup of the heater (HTRSET)
+    pub heater_setup: HeaterSetup,
+    /// Heater output mode.
+    pub heater_output_mode: OutputModeSetup,
+    /// Heater output range.
+    pub heater_output_range: HeaterRange,
 }
 
 impl LakeshoreTempConfig {
@@ -176,12 +222,24 @@ impl LakeshoreTempConfig {
 impl Default for LakeshoreTempConfig {
     fn default() -> Self {
         Self {
-            sample_temperature_heater: Temperature::from_kelvin(120.0),
             usb_prod_info: Some(String::from("Model 336 Temperature Controller")),
             channel_a_name: Some(ThermocoupleChannelName::Sample),
             channel_b_name: Some(ThermocoupleChannelName::Bridge),
             channel_c_name: None,
             channel_d_name: None,
+            heater_output_channel: Output::Out1,
+            heater_setup: HeaterSetup::try_new(
+                HeaterResistance::R25Ohm,
+                HeaterMaxOutputCurrent::C2A,
+                HeaterOutputDisplay::Current,
+            )
+            .expect("Valid config"),
+            heater_output_mode: OutputModeSetup::new(
+                OutputMode::ClosedLoopPID,
+                Some(Input::InA),
+                OnPowerup::Disabled,
+            ),
+            heater_output_range: HeaterRange::Medium,
         }
     }
 }

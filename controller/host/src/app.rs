@@ -14,7 +14,7 @@ use sunpower_cryotelgt::CoolerState;
 use tokio::sync::{OnceCell, mpsc};
 
 use crate::{
-    INST_STATUS, PRG_CONF,
+    PRG_CONF,
     controller::{ControllerCommands, send_cntrl_cmd_now},
     instruments::{
         InstrumentCommands,
@@ -38,13 +38,6 @@ pub fn app_main() -> Result<(), Box<dyn Error>> {
 
     let _ = UI.set(ui.as_weak());
     let conf = PRG_CONF.get().expect("PrgConf is Initialized");
-
-    // initialize instrument status.
-    let inst_status = INST_STATUS.get().expect("InstStat must be initialized.");
-    inst_status
-        .lock()
-        .expect("InstStat mutex is poisoned")
-        .initialize();
 
     // initialize the various GUI handlers
     let _controller_cmd_handler = ControllerCommandHandler::new(ui.as_weak());
