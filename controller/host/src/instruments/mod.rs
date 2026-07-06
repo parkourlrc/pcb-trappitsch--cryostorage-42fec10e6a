@@ -176,10 +176,9 @@ pub async fn instruments_task(mut rx_instr: mpsc::Receiver<InstrumentCommands>) 
     // set the max temperature to the ui
     let ui = get_ui_wait().await;
     ui.upgrade_in_event_loop({
-        let max_safe_sample_temp = sample_setpoint_temperature + temp_safety_half_band;
         move |ui| {
             ui.global::<Logic>()
-                .set_max_safe_temperature(max_safe_sample_temp.as_kelvin() as f32);
+                .set_max_temp_halfband(temp_safety_half_band.as_kelvin() as f32);
         }
     })
     .expect("UI is alive");

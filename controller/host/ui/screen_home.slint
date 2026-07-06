@@ -31,7 +31,7 @@ export component HomeScreen inherits MyWindow {
             InfoArea {
                 title: "Sample temperature";
                 title_color: Palette.rosewater;
-                text_color: (Logic.sample_temp > 0 && Logic.sample_temp < 120) ? Palette.blue : Palette.red;
+                text_color: (Logic.sample_temp > 0 && Logic.sample_temp < (Logic.target_temp + Logic.max_temp_halfband)) ? Palette.blue : Palette.red;
                 text: (Logic.sample_temp == 0) ? "Error" : Logic.sample_temp + " K";
             }
 
