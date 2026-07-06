@@ -18,7 +18,7 @@ use lakeshore336::{
     },
 };
 
-use measurements::Temperature;
+use measurements::{Fraction, Temperature};
 use serde::{Deserialize, Serialize};
 use serialport::{SerialPort, SerialPortType};
 
@@ -125,6 +125,21 @@ impl LakeshoreTempInst {
                 .set_range(HeaterRange::Off)?;
         }
         Ok(())
+    }
+
+    /// Get the current heater output of the heater of interest.
+    pub fn get_heater_output(&mut self) -> Result<Fraction> {
+        self.check_connection()?;
+        if let Some(inst) = self.instrument.as_mut() {
+            let hout = inst
+                .output(self.config.heater_output_channel)
+                .get_heater_output()?;
+            Ok(hout)
+        } else {
+            bail!(
+                "Could not get current heater output. Lakeshore temperature controller not connected (should be unreachable)"
+            )
+        }
     }
 
     /// Get the heater setpoint temperature.

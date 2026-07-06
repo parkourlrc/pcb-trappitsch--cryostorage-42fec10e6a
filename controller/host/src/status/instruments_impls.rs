@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use anyhow::Result;
 
 use icd::ValveState;
-use measurements::{Power, Pressure, Temperature};
+use measurements::{Fraction, Power, Pressure, Temperature};
 use pfeiffer_hicube::PumpStandState;
 use slint::ComponentHandle;
 use sunpower_cryotelgt::CoolerState;
@@ -132,6 +132,11 @@ impl InstrumentStatus {
         self.power_cooler_current = power;
     }
 
+    /// Set the current heater output power of Lakeshore336.
+    pub fn set_heater_output_current(&mut self, heater_output: Fraction) {
+        self.heater_current_output = heater_output;
+    }
+
     /// Set the current pressures and gauge statuses.
     pub fn set_pressures(&mut self, pressure_hm: HashMap<Gauge, Option<Pressure>>) {
         // pressures
@@ -224,6 +229,9 @@ impl InstrumentStatus {
                 0
             };
 
+            let heater_current_output_percent =
+                self.heater_current_output.as_percent().round() as i32;
+
             let pressure_chamber_display = self.pressure_chamber_current.as_shared_string();
             let pressure_chamber_gauge_is_on: bool = self.pressure_chamber_gauge.into();
             let pressure_transfer_display = self.pressure_transfer_current.as_shared_string();
@@ -233,7 +241,10 @@ impl InstrumentStatus {
                 ui.global::<Logic>().set_sample_temp(sample_temp);
                 ui.global::<Logic>().set_bridge_temp(bridge_temp);
                 ui.global::<Logic>().set_cooler_temp(cooler_temp);
-                ui.global::<Logic>().set_current_power(cooler_current_power);
+                ui.global::<Logic>()
+                    .set_cryocooler_power(cooler_current_power);
+                ui.global::<Logic>()
+                    .set_heater_output(heater_current_output_percent);
                 ui.global::<Logic>()
                     .set_chamber_pressure(pressure_chamber_display);
                 ui.global::<Logic>()

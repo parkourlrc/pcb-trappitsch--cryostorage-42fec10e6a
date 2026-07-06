@@ -7,7 +7,7 @@
 //! - `instruments_impls.rs`: Handle updates from instruments and related UI updates.
 
 use icd::{BakingState, FlowMeterState, LightState, ValveState, VctState};
-use measurements::{Power, Pressure, Temperature};
+use measurements::{Fraction, Power, Pressure, Temperature};
 use pfeiffer_hicube::PumpStandState;
 use sunpower_cryotelgt::CoolerState;
 
@@ -29,6 +29,7 @@ pub struct InstrumentStatus {
     hi_cube_pump_stand_state: PumpStandState,
     hi_cube_venting_valve: ValveState,
     power_cooler_current: Power,
+    heater_current_output: Fraction,
     pressure_chamber_current: PressureReading,
     pressure_chamber_gauge: GaugeStatus,
     pressure_transfer_current: PressureReading,
@@ -57,6 +58,7 @@ impl InstrumentStatus {
             hi_cube_venting_valve: ValveState::default(),
             ion_pump_state: PumpState::default(),
             power_cooler_current: Power::default(), // 0.0 W
+            heater_current_output: Fraction::default(), // 0%
             pressure_chamber_current: PressureReading::default(), // Off
             pressure_chamber_gauge: GaugeStatus::Off,
             pressure_transfer_current: PressureReading::default(), // Off

@@ -14,6 +14,7 @@ import {
     InfoAreaSmall,
     RegularButton,
     ShortButton,
+    LongButton,
 } from "elements.slint";
 
 export component CryoScreen inherits MyWindow {
@@ -56,9 +57,18 @@ export component CryoScreen inherits MyWindow {
                 }
             }
 
-            StatusOkErr {
-                title: "Water flow";
-                ok: Logic.water_flow_ok;
+            MyVerticalLayout {
+                StatusOkErr {
+                    title: "Water flow";
+                    ok: Logic.water_flow_ok;
+                }
+
+                LongButton {
+                    text: "Set target temperature";
+                    clicked => {
+                        Logic.set_setpoint_temp();
+                    }
+                }
             }
         }
 
@@ -75,15 +85,13 @@ export component CryoScreen inherits MyWindow {
                 }
 
                 InfoAreaSmall {
-                    title: "Cooler power";
-                    text: Logic.current_power + " W";
+                    title: "Heater output";
+                    text: Logic.heater_output + "%";
                 }
 
-                ShortButton {
-                    text: "Set target temperature";
-                    clicked => {
-                        Logic.set_setpoint_temp();
-                    }
+                InfoAreaSmall {
+                    title: "Cooler power";
+                    text: Logic.cryocooler_power + " W";
                 }
             }
         }

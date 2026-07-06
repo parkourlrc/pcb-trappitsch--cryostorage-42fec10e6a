@@ -25,7 +25,7 @@ use slint::ComponentHandle;
 use std::{collections::HashMap, time::Duration};
 
 use agilent_4uhv::HvState;
-use measurements::{Power, Temperature};
+use measurements::{Fraction, Power, Temperature};
 use sunpower_cryotelgt::CoolerState;
 use tokio::sync::{OnceCell, mpsc};
 
@@ -232,6 +232,18 @@ pub async fn instruments_task(mut rx_instr: mpsc::Receiver<InstrumentCommands>) 
                 };
                 inst_status.lock().expect("InstrumentStatus lock poisoned")
                     .set_power_cooler_current(current_power);
+
+                // Get the current heater output.
+                let current_heater_output = match lakeshore_temp_inst.get_heater_output() {
+                    Ok(f) => f,
+                    Err(e) => {
+                        log::err!("Failed to read current heater output from Lakeshore336: {}", e).await;
+                        lakeshore_temp_inst.reset_instrument();
+                        Fraction::default()
+                    }
+                };
+                inst_status.lock().expect("InstrumentStatus lock poisoned")
+                    .set_heater_output_current(current_heater_output);
 
                 // Pressures read from Omnicontrol
                 let mut pressures = HashMap::new();

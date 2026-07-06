@@ -9,12 +9,7 @@ export struct BakingTime {
 }
 
 // Valve and pump states
-export enum ValveOrPumpState {
-    OpenOrOn,
-    ClosedOrOff,
-    UndefinedOrError,
-    SetDifferentFromCalled
-}
+export enum ValveOrPumpState { OpenOrOn, ClosedOrOff, UndefinedOrError, SetDifferentFromCalled }
 
 // Pump stand states
 export enum PumpStandStateGUI {
@@ -67,7 +62,7 @@ export global Logic {
 
     // Samples
     pure callback edit_sample_name(string, string, string);
-    in-out property <[{ pos: string, name: string, date_str: string}]> sample_model: [
+    in-out property <[{ pos: string, name: string, date_str: string }]> sample_model: [
         { pos: "A1", name: "", date_str: "" },
         { pos: "A2", name: "", date_str: "" },
         { pos: "B1", name: "", date_str: "" },
@@ -90,7 +85,8 @@ export global Logic {
     in-out property <int> cooler_temp; // K
     in property <image> temperature_plot;
     in property <int> target_temp; // K
-    in property <int> current_power; // W
+    in property <int> heater_output;
+    in property <int> cryocooler_power; // W
     pure callback set_setpoint_temp();
 
     // Vacuum
